@@ -155,6 +155,7 @@ function addStyles() {
     .rsn-card-tool { height:24px; padding:0 7px; border:0; border-radius:6px; background:#3b3e48; color:#fff; cursor:pointer; font-size:12px; }
     .rsn-card-tool.rsn-on { color:#ffd75e; }
     .rsn-card-tool.rsn-avoided { background:#51272c; color:#ff6b72; box-shadow:inset 0 0 0 1px #784047; }
+    .rsn-card-tool.rsn-copied { background:#24543a; color:#83e3a9; box-shadow:inset 0 0 0 1px #347452; }
     .rsn-ping { margin-left:auto; padding:3px 7px; border-radius:999px; background:#555963; color:#fff; font-size:11px; font-weight:700; }
     .rsn-ping.good { background:#267a4b; } .rsn-ping.fair { background:#8a6a20; } .rsn-ping.poor { background:#8a3540; }
   `;
@@ -394,6 +395,7 @@ function install(section) {
   const favorites = new Set();
   const avoided = new Set();
   const serverInfo = new Map();
+  const copyResetTimers = new WeakMap();
   const filters = {
     min:Math.max(0, Number(featureSettings.minPlayers) || 0),
     max:featureSettings.maxPlayers === null || featureSettings.maxPlayers === undefined || featureSettings.maxPlayers === ""
@@ -626,7 +628,20 @@ function install(section) {
     const row=tool.closest(".rsn-card-tools");const id=row?.dataset.id;if(!id)return;
     if(tool.dataset.tool==="favorite"){favorites.has(id)?favorites.delete(id):favorites.add(id);chrome.storage.local.set({[favoriteKey]:[...favorites]});render();}
     if(tool.dataset.tool==="avoid"){avoided.has(id)?avoided.delete(id):avoided.add(id);chrome.storage.local.set({[avoidKey]:[...avoided]});render();}
-    if(tool.dataset.tool==="copy"){try{await navigator.clipboard.writeText(row.dataset.fullId||id);status.textContent="Server ID copied.";}catch{status.textContent="Could not copy server ID.";}}
+    if(tool.dataset.tool==="copy"){
+      clearTimeout(copyResetTimers.get(tool));
+      try{
+        await navigator.clipboard.writeText(row.dataset.fullId||id);
+        tool.textContent="Copied!";
+        tool.classList.add("rsn-copied");
+        status.textContent="Server ID copied.";
+      }catch{
+        tool.textContent="Try again";
+        tool.classList.remove("rsn-copied");
+        status.textContent="Could not copy server ID.";
+      }
+      copyResetTimers.set(tool,setTimeout(()=>{tool.textContent="Copy ID";tool.classList.remove("rsn-copied");copyResetTimers.delete(tool);},1400));
+    }
   },true);
 
   // Roblox replaces each card's inner contents after thumbnails and server
