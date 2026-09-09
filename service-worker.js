@@ -137,6 +137,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "SEARCH_SERVER_ID") {
+    (async () => {
+      try {
+        const query = String(message.serverId || "").toLowerCase();
+        let cursor = null;
+        let pages = 0;
+        do {
+          const params = new URLSearchParams({ sortOrder:"Desc", excludeFullGames:"false", limit:"100" });
+          if (cursor) params.set("cursor", cursor);
+          const data = await fetchRobloxJson(`https://games.roblox.com/v1/games/${message.placeId}/servers/Public?${params}`);
+          const server = (data.data || []).find((item) => {
+            const id = String(item.id || "").toLowerCase();
+            return id === query || `${id.slice(0,4)}-${id.slice(-4)}` === query;
+          });
+          if (server) {
+            sendResponse({ success:true, server, capped:false });
+            return;
+          }
+          cursor = data.nextPageCursor || null;
+          pages += 1;
+        } while (cursor && pages < 100);
+        sendResponse({ success:true, server:null, capped:Boolean(cursor) });
+      } catch (error) {
+        sendResponse({ success:false, error:error.message });
+      }
+    })();
+    return true;
+  }
+
   if (message.type === "GET_PLAYER_THUMBNAILS") {
     const tokens = [...new Set(message.tokens || [])].slice(0, 100);
     const requests = tokens.map((token, index) => ({

@@ -7,6 +7,7 @@ A Chrome extension that adds faster navigation, player filters, card tools, and 
 - Browse servers in pages of 8.
 - Move backward or forward by 1, 10, or 100 pages.
 - Jump to a custom page, the first page, or the last page.
+- Search for a server using its full ID or the shortened ID shown on a card.
 - Filter loaded servers by minimum and maximum player count.
 - Limit the Maximum field to the current game's detected server capacity.
 - Favorite servers for quick visual reference.
@@ -22,6 +23,7 @@ A Chrome extension that adds faster navigation, player filters, card tools, and 
 The popup provides controls for:
 
 - Random and Rejoin buttons
+- Server ID search with loaded-card highlighting and direct Join
 - Page navigation
 - Minimum and maximum player filters
 - Last-page and total-count controls
@@ -69,6 +71,7 @@ After changing extension files, select **Reload** on the extension's card and re
 ## Notes
 
 - Min/Max filters apply only to servers Roblox has already loaded; they do not search every active server.
+- Server ID search checks loaded cards first, then searches up to 10,000 public servers through the Roblox API.
 - Open or refresh a Roblox game page before using the popup so the current server capacity can be detected.
 - Favorite and Avoid marks refer to individual server instances and may become irrelevant after a server closes.
 - **Clear avoided** removes all Avoid marks for the current game.

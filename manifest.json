@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Roblox Server Navigator",
   "version": "1.0.0",
-  "description": "Browse Roblox servers, join a random server, and rejoin the last server.",
+  "description": "Improve Roblox server browsing with page navigation, player filters, favorites, server tools, random join, and rejoin.",
   "permissions": [
     "storage"
   ],
