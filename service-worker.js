@@ -1,3 +1,73 @@
+const FEATURE_SETTINGS_KEY = "rsn-feature-settings";
+const ICON_FEATURES = ["randomServer", "rejoinServer", "pagination", "playerFilters", "totalControls", "favorites", "avoid", "copyId"];
+const ICON_DEFAULTS = Object.fromEntries(ICON_FEATURES.map((feature) => [feature, true]));
+
+function drawToolbarIcon(size, color) {
+  const canvas = new OffscreenCanvas(size, size);
+  const context = canvas.getContext("2d");
+  const inset = Math.max(1, Math.round(size * .06));
+  const radius = Math.round(size * .24);
+  const left = inset;
+  const top = inset;
+  const right = size - inset;
+  const bottom = size - inset;
+
+  context.beginPath();
+  context.moveTo(left + radius, top);
+  context.lineTo(right - radius, top);
+  context.quadraticCurveTo(right, top, right, top + radius);
+  context.lineTo(right, bottom - radius);
+  context.quadraticCurveTo(right, bottom, right - radius, bottom);
+  context.lineTo(left + radius, bottom);
+  context.quadraticCurveTo(left, bottom, left, bottom - radius);
+  context.lineTo(left, top + radius);
+  context.quadraticCurveTo(left, top, left + radius, top);
+  context.closePath();
+  context.fillStyle = color;
+  context.fill();
+
+  context.fillStyle = "#ffffff";
+  const unit = size / 16;
+  context.fillRect(4 * unit, 3 * unit, 2 * unit, 10 * unit);
+  context.fillRect(6 * unit, 3 * unit, 4 * unit, 2 * unit);
+  context.fillRect(6 * unit, 7 * unit, 4 * unit, 2 * unit);
+  context.fillRect(9 * unit, 4 * unit, 2 * unit, 4 * unit);
+  context.beginPath();
+  context.moveTo(7 * unit, 8 * unit);
+  context.lineTo(11 * unit, 13 * unit);
+  context.lineWidth = 2 * unit;
+  context.lineCap = "square";
+  context.strokeStyle = "#ffffff";
+  context.stroke();
+  return context.getImageData(0, 0, size, size);
+}
+
+function updateToolbarIcon(savedSettings = {}) {
+  const settings = { ...ICON_DEFAULTS, ...savedSettings };
+  const active = ICON_FEATURES.filter((feature) => settings[feature] !== false).length;
+  const color = active === ICON_FEATURES.length ? "#2f7654" : active === 0 ? "#c7504a" : "#d1841f";
+  chrome.action.setIcon({
+    imageData: {
+      16: drawToolbarIcon(16, color),
+      32: drawToolbarIcon(32, color)
+    }
+  });
+  chrome.action.setTitle({ title:`Roblox Server Navigator — ${active} of ${ICON_FEATURES.length} active` });
+}
+
+function refreshToolbarIcon() {
+  chrome.storage.local.get(FEATURE_SETTINGS_KEY, (result) => updateToolbarIcon(result[FEATURE_SETTINGS_KEY] || {}));
+}
+
+chrome.runtime.onInstalled.addListener(refreshToolbarIcon);
+chrome.runtime.onStartup.addListener(refreshToolbarIcon);
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[FEATURE_SETTINGS_KEY]) {
+    updateToolbarIcon(changes[FEATURE_SETTINGS_KEY].newValue || {});
+  }
+});
+refreshToolbarIcon();
+
 async function fetchRobloxJson(url, options = {}, attempts = 5) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
