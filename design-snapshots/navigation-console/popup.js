@@ -1,5 +1,4 @@
 const SETTINGS_KEY = "rsn-feature-settings";
-const THEME_KEY = "rsn-popup-theme";
 const defaults = { randomServer:true, rejoinServer:true, pagination:true, playerFilters:true, minPlayers:0, maxPlayers:null, totalControls:true, favorites:true, avoid:true, copyId:true };
 const switches = [...document.querySelectorAll("input[data-feature]")];
 const playerFilterToggle = document.querySelector("#player-filter-toggle");
@@ -10,12 +9,8 @@ const copyAction = document.querySelector("[data-action-feature='copyId']");
 const statusText = document.querySelector("#status > span:last-child");
 const toggleAll = document.querySelector("#toggle-all");
 const enabledCount = document.querySelector("#enabled-count");
-const statusDot = document.querySelector(".status-dot");
 const undoToast = document.querySelector("#undo-toast");
 const undoButton = document.querySelector("#undo");
-const themeToggle = document.querySelector("#theme-toggle");
-const themeLabel = themeToggle.querySelector(".theme-label");
-const themeKnob = themeToggle.querySelector(".theme-knob");
 let settings = { ...defaults };
 let undoSettings = null;
 let undoTimer = null;
@@ -31,17 +26,13 @@ function syncUI() {
   playerFilterToggle.textContent = settings.playerFilters ? "Shown" : "Hidden";
   playerFilterControl.classList.toggle("is-hidden", !settings.playerFilters);
   copyAction.setAttribute("aria-pressed", String(settings.copyId));
-  copyAction.querySelector(".action-state").textContent = settings.copyId ? "Active" : "Off";
+  copyAction.querySelector(".action-state").textContent = settings.copyId ? "On" : "Off";
   minPlayers.value = settings.minPlayers > 0 ? settings.minPlayers : "";
   maxPlayers.value = settings.maxPlayers === null ? "" : settings.maxPlayers;
   const values = featureValues();
   const active = values.filter(Boolean).length;
-  const allActive = active === values.length;
-  const allOff = active === 0;
   enabledCount.textContent = `${active} of ${values.length} active`;
-  statusDot.dataset.state = allOff ? "off" : allActive ? "active" : "mixed";
-  toggleAll.textContent = allActive ? "All features: Active" : allOff ? "All features: Off" : "All features: Mixed";
-  toggleAll.dataset.state = allOff ? "off" : allActive ? "on" : "mixed";
+  toggleAll.textContent = values.every(Boolean) ? "Power down" : "Enable all";
 }
 
 function dismissUndo() {
@@ -51,6 +42,7 @@ function dismissUndo() {
 }
 
 function showUndo(message) {
+  undoToast.querySelector("span").textContent = message;
   undoToast.hidden = false;
   clearTimeout(undoTimer);
   undoTimer = setTimeout(dismissUndo, 5000);
@@ -75,26 +67,6 @@ function normalizedRange() {
 chrome.storage.local.get(SETTINGS_KEY, (result) => {
   settings = { ...defaults, ...(result[SETTINGS_KEY] || {}) };
   syncUI();
-});
-
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
-  themeLabel.textContent = theme === "dark" ? "Dark" : "Light";
-  themeKnob.textContent = theme === "dark" ? "☾" : "☀";
-  themeToggle.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
-  themeToggle.title = themeToggle.getAttribute("aria-label");
-}
-
-chrome.storage.local.get(THEME_KEY, (result) => {
-  const theme = result[THEME_KEY] || "light";
-  applyTheme(theme);
-});
-
-themeToggle.addEventListener("click", () => {
-  const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  applyTheme(theme);
-  chrome.storage.local.set({ [THEME_KEY]:theme });
 });
 
 for (const control of switches) {
@@ -133,7 +105,7 @@ toggleAll.addEventListener("click", () => {
   const enableAll = !featureValues().every(Boolean);
   for (const key of ["randomServer","rejoinServer","pagination","playerFilters","totalControls","favorites","avoid","copyId"]) settings[key] = enableAll;
   saveSettings();
-  showUndo(enableAll ? "All features on" : "All features off");
+  showUndo(enableAll ? "All features powered up" : "Navigation deck powered down");
 });
 
 undoButton.addEventListener("click", () => {
