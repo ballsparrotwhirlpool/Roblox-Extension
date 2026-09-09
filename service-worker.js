@@ -1,6 +1,7 @@
 const FEATURE_SETTINGS_KEY = "rsn-feature-settings";
 const ICON_FEATURES = ["randomServer", "rejoinServer", "pagination", "playerFilters", "totalControls", "favorites", "avoid", "copyId"];
 const ICON_DEFAULTS = Object.fromEntries(ICON_FEATURES.map((feature) => [feature, true]));
+let robloxIcon = null;
 
 function drawToolbarIcon(size, color) {
   const canvas = new OffscreenCanvas(size, size);
@@ -46,10 +47,14 @@ function updateToolbarIcon(savedSettings = {}) {
   const settings = { ...ICON_DEFAULTS, ...savedSettings };
   const active = ICON_FEATURES.filter((feature) => settings[feature] !== false).length;
   const color = active === ICON_FEATURES.length ? "#2f7654" : active === 0 ? "#c7504a" : "#d1841f";
+  robloxIcon = {
+    16: drawToolbarIcon(16, color),
+    32: drawToolbarIcon(32, color)
+  };
   chrome.action.setIcon({
     imageData: {
-      16: drawToolbarIcon(16, color),
-      32: drawToolbarIcon(32, color)
+      16: drawToolbarIcon(16, "#c7504a"),
+      32: drawToolbarIcon(32, "#c7504a")
     }
   });
   chrome.action.setTitle({ title:`Roblox Server Navigator — ${active} of ${ICON_FEATURES.length} active` });
@@ -67,6 +72,17 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 refreshToolbarIcon();
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status !== "loading") return;
+  chrome.action.setIcon({
+    tabId,
+    imageData: {
+      16: drawToolbarIcon(16, "#c7504a"),
+      32: drawToolbarIcon(32, "#c7504a")
+    }
+  });
+});
 
 async function fetchRobloxJson(url, options = {}, attempts = 5) {
   let lastError;
@@ -90,6 +106,20 @@ async function fetchRobloxJson(url, options = {}, attempts = 5) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "ROBLOX_PAGE_ACTIVE" && sender.tab?.id !== undefined) {
+    const tabId = sender.tab.id;
+    if (robloxIcon) {
+      chrome.action.setIcon({ tabId, imageData:robloxIcon });
+    } else {
+      chrome.storage.local.get(FEATURE_SETTINGS_KEY, (result) => {
+        updateToolbarIcon(result[FEATURE_SETTINGS_KEY] || {});
+        chrome.action.setIcon({ tabId, imageData:robloxIcon });
+      });
+    }
+    sendResponse({ success:true });
+    return;
+  }
+
   if (message.type === "GET_GAME_PLAYER_COUNT") {
     (async () => {
       try {

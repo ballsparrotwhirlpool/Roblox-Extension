@@ -32,11 +32,13 @@ h2 { margin:0; color:#4d534c; font-size:11px; font-weight:750; letter-spacing:.0
 .range-copy { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
 .visibility-button { width:52px; height:24px; padding:0; border:1px solid #b8d2c1; border-radius:99px; background:var(--green-soft); color:var(--green); cursor:pointer; font-size:10px; font-weight:750; }
 .visibility-button[aria-pressed="false"] { border-color:#dfaaa6; background:var(--red-soft); color:var(--red); }
-.range-fields { display:grid; grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr); align-items:end; gap:5px; margin:0; padding:2px 0 0; background:transparent; }
+.range-fields { display:grid; grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr) 42px; align-items:end; gap:4px; margin:0; padding:2px 0 0; background:transparent; }
 .range-fields label>span { display:block; margin-bottom:3px; color:var(--muted); font-size:10px; }
 .range-fields input { width:100%; height:28px; padding:0 8px; border:1px solid #d3d5ce; border-radius:6px; outline:0; background:#fff; color:var(--ink); font-size:11px; }
 .range-fields input:focus { border-color:var(--green); box-shadow:0 0 0 2px rgba(47,118,84,.1); }
 .range-separator { padding-bottom:7px; color:#9da198; font-size:10px; text-align:center; }
+#reset-player-range { height:28px; padding:0; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--muted); cursor:pointer; font-size:9px; font-weight:700; }
+#reset-player-range:hover { border-color:#aeb4ba; color:var(--ink); }
 .tool-row { display:grid; grid-template-columns:1fr 1fr; overflow:hidden; border:1px solid var(--line); border-radius:6px 6px 0 0; background:var(--surface); }
 .tool-row label { display:flex; align-items:center; justify-content:space-between; min-height:45px; padding:5px 10px; cursor:pointer; }
 .tool-row strong { display:block; font-size:12px; font-weight:650; }
@@ -72,6 +74,7 @@ footer { display:flex; align-items:center; gap:8px; margin-top:8px; padding-top:
 [data-theme="dark"] .setting-row,[data-theme="dark"] .range-setting { border-bottom-color:#2d2f34; }
 [data-theme="dark"] .primary-section .setting-row:first-child,[data-theme="dark"] .tool-row label:first-child { border-right-color:#2d2f34; }
 [data-theme="dark"] .range-fields input { border-color:#41444a; background:#141518; color:var(--ink); }
+[data-theme="dark"] #reset-player-range { border-color:#41444a; background:#24262a; }
 [data-theme="dark"] .copy-action { background:#191a1d; }
 [data-theme="dark"] .copy-action:hover { background:#202522; }
 [data-theme="dark"] #toggle-all { border-color:#3b5947; background:#18231d; }

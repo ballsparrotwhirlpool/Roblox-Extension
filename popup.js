@@ -1,11 +1,13 @@
 const SETTINGS_KEY = "rsn-feature-settings";
 const THEME_KEY = "rsn-popup-theme";
+const CAPACITY_KEY = "rsn-current-server-capacity";
 const defaults = { randomServer:true, rejoinServer:true, pagination:true, playerFilters:true, minPlayers:0, maxPlayers:null, totalControls:true, favorites:true, avoid:true, copyId:true };
 const switches = [...document.querySelectorAll("input[data-feature]")];
 const playerFilterToggle = document.querySelector("#player-filter-toggle");
 const playerFilterControl = document.querySelector("#player-filter-control");
 const minPlayers = document.querySelector("#min-players");
 const maxPlayers = document.querySelector("#max-players");
+const resetPlayerRange = document.querySelector("#reset-player-range");
 const copyAction = document.querySelector("[data-action-feature='copyId']");
 const statusText = document.querySelector("#status > span:last-child");
 const toggleAll = document.querySelector("#toggle-all");
@@ -17,6 +19,7 @@ const themeToggle = document.querySelector("#theme-toggle");
 const themeLabel = themeToggle.querySelector(".theme-label");
 const themeKnob = themeToggle.querySelector(".theme-knob");
 let settings = { ...defaults };
+let serverCapacity = null;
 let undoSettings = null;
 let undoTimer = null;
 let statusTimer = null;
@@ -33,7 +36,9 @@ function syncUI() {
   copyAction.setAttribute("aria-pressed", String(settings.copyId));
   copyAction.querySelector(".action-state").textContent = settings.copyId ? "Active" : "Off";
   minPlayers.value = settings.minPlayers > 0 ? settings.minPlayers : "";
-  maxPlayers.value = settings.maxPlayers === null ? "" : settings.maxPlayers;
+  maxPlayers.max = serverCapacity ?? "";
+  maxPlayers.placeholder = serverCapacity === null ? "Server cap" : String(serverCapacity);
+  maxPlayers.value = settings.maxPlayers === null ? (serverCapacity ?? "") : Math.min(settings.maxPlayers, serverCapacity ?? settings.maxPlayers);
   const values = featureValues();
   const active = values.filter(Boolean).length;
   const allActive = active === values.length;
@@ -67,13 +72,27 @@ function saveSettings(message = "Updated on the Roblox page") {
 
 function normalizedRange() {
   const minimum = minPlayers.value === "" ? 0 : Math.max(0, Math.floor(Number(minPlayers.value) || 0));
-  let maximum = maxPlayers.value === "" ? null : Math.max(0, Math.floor(Number(maxPlayers.value) || 0));
+  let maximum = maxPlayers.value === "" ? serverCapacity : Math.max(0, Math.floor(Number(maxPlayers.value) || 0));
+  if (serverCapacity !== null && maximum !== null) maximum = Math.min(maximum, serverCapacity);
   if (maximum !== null && maximum < minimum) maximum = minimum;
   return { minimum, maximum };
 }
 
 chrome.storage.local.get(SETTINGS_KEY, (result) => {
   settings = { ...defaults, ...(result[SETTINGS_KEY] || {}) };
+  syncUI();
+});
+
+chrome.storage.local.get(CAPACITY_KEY, (result) => {
+  const capacity = Number(result[CAPACITY_KEY]?.capacity);
+  serverCapacity = Number.isFinite(capacity) && capacity >= 0 ? capacity : null;
+  syncUI();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes[CAPACITY_KEY]) return;
+  const capacity = Number(changes[CAPACITY_KEY].newValue?.capacity);
+  serverCapacity = Number.isFinite(capacity) && capacity >= 0 ? capacity : null;
   syncUI();
 });
 
@@ -115,6 +134,13 @@ for (const field of [minPlayers, maxPlayers]) {
     saveSettings("Player range updated");
   });
 }
+
+resetPlayerRange.addEventListener("click", () => {
+  dismissUndo();
+  settings.minPlayers = 0;
+  settings.maxPlayers = serverCapacity;
+  saveSettings("Player range reset");
+});
 
 playerFilterToggle.addEventListener("click", () => {
   dismissUndo();

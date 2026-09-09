@@ -4,6 +4,7 @@ const PAGE_SIZE = 8;
 const TOTAL_BLOCK = 100;
 const LARGE_GAME_PLAYER_THRESHOLD = 10000;
 const FEATURE_SETTINGS_KEY = "rsn-feature-settings";
+const CURRENT_CAPACITY_KEY = "rsn-current-server-capacity";
 const DEFAULT_FEATURE_SETTINGS = {
   randomServer:true,
   rejoinServer:true,
@@ -17,6 +18,10 @@ const DEFAULT_FEATURE_SETTINGS = {
   copyId:true
 };
 const featureSettings = { ...DEFAULT_FEATURE_SETTINGS };
+
+function markRobloxPageActive() {
+  chrome.runtime.sendMessage({ type:"ROBLOX_PAGE_ACTIVE" }, () => void chrome.runtime.lastError);
+}
 
 function setFeatureVisible(element, visible) {
   if (element) element.style.setProperty("display", visible ? "" : "none", "important");
@@ -55,11 +60,13 @@ function applyFeatureVisibility() {
 chrome.storage.local.get(FEATURE_SETTINGS_KEY, (result) => {
   Object.assign(featureSettings, result[FEATURE_SETTINGS_KEY] || {});
   applyFeatureVisibility();
+  markRobloxPageActive();
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local" || !changes[FEATURE_SETTINGS_KEY]) return;
   Object.assign(featureSettings, DEFAULT_FEATURE_SETTINGS, changes[FEATURE_SETTINGS_KEY].newValue || {});
   applyFeatureVisibility();
+  markRobloxPageActive();
   window.dispatchEvent(new CustomEvent("rsn-feature-settings-changed"));
 });
 
@@ -404,6 +411,7 @@ function install(section) {
     favoritesOnly:false
   };
   let resetTimer = null;
+  let publishedCapacity = null;
 
   window.addEventListener("rsn-native-server-data", (event) => {
     for (const server of event.detail?.servers || []) {
@@ -508,6 +516,10 @@ function install(section) {
     if (capacity >= 0) {
       pager.querySelector('[data-filter="min"]').max = capacity;
       pager.querySelector('[data-filter="max"]').max = capacity;
+      if (capacity !== publishedCapacity) {
+        publishedCapacity = capacity;
+        chrome.storage.local.set({ [CURRENT_CAPACITY_KEY]:{ placeId:getPlaceId(), capacity } });
+      }
     }
     const usable = visibleCards();
     const start = (state.page - 1) * PAGE_SIZE;
