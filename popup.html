@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Server Navigator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>Server Navigator</h1>
+    <p>Choose which features appear on Roblox.</p>
+    <section>
+      <h2>Play buttons</h2>
+      <label><input type="checkbox" data-feature="rejoinServer"> Rejoin last server</label>
+      <label><input type="checkbox" data-feature="randomServer"> Join random server</label>
+    </section>
+    <section>
+      <h2>Server browser</h2>
+      <label><input type="checkbox" data-feature="pagination"> Page navigation</label>
+      <label><input type="checkbox" data-feature="playerFilters"> Min/Max player filters</label>
+      <label><input type="checkbox" data-feature="totalControls"> Last page and Refresh total</label>
+    </section>
+    <section>
+      <h2>Card utilities</h2>
+      <label><input type="checkbox" data-feature="favorites"> Favorite servers</label>
+      <label><input type="checkbox" data-feature="avoid"> Avoid servers</label>
+      <label><input type="checkbox" data-feature="copyId"> Copy server ID</label>
+    </section>
+    <div id="status" role="status">Changes apply immediately.</div>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
