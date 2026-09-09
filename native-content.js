@@ -9,6 +9,8 @@ const DEFAULT_FEATURE_SETTINGS = {
   rejoinServer:true,
   pagination:true,
   playerFilters:true,
+  minPlayers:0,
+  maxPlayers:null,
   totalControls:true,
   favorites:true,
   avoid:true,
@@ -152,6 +154,7 @@ function addStyles() {
     .rsn-card-tools { display:flex; align-items:center; gap:5px; margin:6px 0; }
     .rsn-card-tool { height:24px; padding:0 7px; border:0; border-radius:6px; background:#3b3e48; color:#fff; cursor:pointer; font-size:12px; }
     .rsn-card-tool.rsn-on { color:#ffd75e; }
+    .rsn-card-tool.rsn-avoided { background:#51272c; color:#ff6b72; box-shadow:inset 0 0 0 1px #784047; }
     .rsn-ping { margin-left:auto; padding:3px 7px; border-radius:999px; background:#555963; color:#fff; font-size:11px; font-weight:700; }
     .rsn-ping.good { background:#267a4b; } .rsn-ping.fair { background:#8a6a20; } .rsn-ping.poor { background:#8a3540; }
   `;
@@ -391,7 +394,13 @@ function install(section) {
   const favorites = new Set();
   const avoided = new Set();
   const serverInfo = new Map();
-  const filters = { min:0, max:null, favoritesOnly:false };
+  const filters = {
+    min:Math.max(0, Number(featureSettings.minPlayers) || 0),
+    max:featureSettings.maxPlayers === null || featureSettings.maxPlayers === undefined || featureSettings.maxPlayers === ""
+      ? null
+      : Math.max(0, Number(featureSettings.maxPlayers) || 0),
+    favoritesOnly:false
+  };
   let resetTimer = null;
 
   window.addEventListener("rsn-native-server-data", (event) => {
@@ -407,8 +416,10 @@ function install(section) {
     (data[favoriteKey] || []).forEach((id) => favorites.add(id));
     (data[avoidKey] || []).forEach((id) => avoided.add(id));
     const saved = data[filterKey] || {};
-    filters.min = Math.max(0, Number(saved.min) || 0);
-    filters.max = saved.max === null || saved.max === undefined || saved.max === "" ? null : Math.max(0, Number(saved.max));
+    filters.min = saved.min === undefined ? filters.min : Math.max(0, Number(saved.min) || 0);
+    filters.max = saved.max === undefined
+      ? filters.max
+      : saved.max === null || saved.max === "" ? null : Math.max(0, Number(saved.max));
     filters.favoritesOnly = Boolean(saved.favoritesOnly);
     pager.querySelector('[data-filter="min"]').value = filters.min || "";
     pager.querySelector('[data-filter="max"]').value = filters.max ?? "";
@@ -436,6 +447,7 @@ function install(section) {
       const outerCard = details.closest(".rbx-public-game-server-item") || details.closest(".card-item-public-server");
       if (outerCard) outerCard.dataset.rsnServerId = id;
       const favorite=tools.querySelector('[data-tool="favorite"]'); favorite.textContent=favorites.has(id)?"★":"☆"; favorite.classList.toggle("rsn-on",favorites.has(id));
+      const avoid=tools.querySelector('[data-tool="avoid"]'); avoid.classList.toggle("rsn-avoided",avoided.has(id)); avoid.setAttribute("aria-pressed",String(avoided.has(id))); avoid.title=avoided.has(id)?"Remove avoid mark":"Mark server to avoid";
       const info=serverInfo.get(id); const badge=tools.querySelector(".rsn-ping");
       badge.hidden=true; badge.textContent=""; badge.className="rsn-ping";
       if(info?.ping>0){badge.hidden=false;badge.textContent=`${info.ping} ms`;badge.className=`rsn-ping ${info.ping<=100?"good":info.ping<=180?"fair":"poor"}`;tools.dataset.fullId=info.id;}
@@ -468,7 +480,6 @@ function install(section) {
     return serverCards(section).filter((card) => {
       const id = cardServerId(card);
       const players = cardPlayerCount(card);
-      if (featureSettings.avoid && avoided.has(id)) return false;
       if (featureSettings.favorites && filters.favoritesOnly && !favorites.has(id)) return false;
       if (featureSettings.playerFilters && players < 0 && (filters.min > 0 || filters.max !== null)) return false;
       if (featureSettings.playerFilters && players >= 0 && players < filters.min) return false;
@@ -498,8 +509,14 @@ function install(section) {
     }
     const usable = visibleCards();
     const start = (state.page - 1) * PAGE_SIZE;
-    cards.forEach((card) => card.style.display="none");
-    usable.slice(start,start+PAGE_SIZE).forEach((card) => card.style.display="");
+    cards.forEach((card) => {
+      card.style.display="none";
+      card.style.minHeight="";
+    });
+    const pageCards = usable.slice(start,start+PAGE_SIZE);
+    pageCards.forEach((card) => card.style.display="");
+    const tallestCard = Math.max(0, ...pageCards.map((card) => card.getBoundingClientRect().height));
+    pageCards.forEach((card) => { card.style.minHeight = `${Math.ceil(tallestCard)}px`; });
     const totalText = state.capped ? `${Math.max(TOTAL_BLOCK, Math.ceil(state.page/TOTAL_BLOCK)*TOTAL_BLOCK)}+` : state.total ?? "…";
     label.textContent = `Page ${state.page} of ${totalText}`;
     input.value = state.page;
@@ -512,7 +529,17 @@ function install(section) {
       button.title = safetyMessage;
     }
   }
-  window.addEventListener("rsn-feature-settings-changed", render);
+  window.addEventListener("rsn-feature-settings-changed", () => {
+    filters.min = Math.max(0, Number(featureSettings.minPlayers) || 0);
+    filters.max = featureSettings.maxPlayers === null || featureSettings.maxPlayers === undefined || featureSettings.maxPlayers === ""
+      ? null
+      : Math.max(filters.min, Number(featureSettings.maxPlayers) || 0);
+    pager.querySelector('[data-filter="min"]').value = filters.min || "";
+    pager.querySelector('[data-filter="max"]').value = filters.max ?? "";
+    state.page = 1;
+    chrome.storage.local.set({ [filterKey]:filters });
+    render();
+  });
   async function loadBatch() {
     const button = loadMoreButton(section);
     if (!button) { state.ended = true; return false; }
@@ -598,7 +625,7 @@ function install(section) {
     event.preventDefault();event.stopPropagation();
     const row=tool.closest(".rsn-card-tools");const id=row?.dataset.id;if(!id)return;
     if(tool.dataset.tool==="favorite"){favorites.has(id)?favorites.delete(id):favorites.add(id);chrome.storage.local.set({[favoriteKey]:[...favorites]});render();}
-    if(tool.dataset.tool==="avoid"){avoided.add(id);chrome.storage.local.set({[avoidKey]:[...avoided]});render();}
+    if(tool.dataset.tool==="avoid"){avoided.has(id)?avoided.delete(id):avoided.add(id);chrome.storage.local.set({[avoidKey]:[...avoided]});render();}
     if(tool.dataset.tool==="copy"){try{await navigator.clipboard.writeText(row.dataset.fullId||id);status.textContent="Server ID copied.";}catch{status.textContent="Could not copy server ID.";}}
   },true);
 
