@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Roblox Server Navigator",
+  "version": "1.0.0",
+  "description": "Browse Roblox servers, join a random server, and rejoin the last server.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://games.roblox.com/*",
+    "https://apis.roblox.com/*",
+    "https://thumbnails.roblox.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Roblox Server Navigator settings",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.roblox.com/games/*",
+        "https://roblox.com/games/*"
+      ],
+      "js": ["join-bridge.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.roblox.com/games/*",
+        "https://roblox.com/games/*"
+      ],
+      "js": ["native-content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
