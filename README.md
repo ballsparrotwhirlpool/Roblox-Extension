@@ -43,7 +43,7 @@ The popup also includes:
 
 ## Toolbar icon
 
-The block-style **R** icon changes color to show extension status:
+The three-bar toolbar icon highlights the current extension status while muting the other two states:
 
 - **Green** on Roblox when all features are active
 - **Orange** on Roblox when the feature selection is mixed
@@ -65,7 +65,7 @@ After changing extension files, select **Reload** on the extension's card and re
 ## Permissions
 
 - `storage` saves feature settings, popup theme, favorites, avoided-server marks, filters, and recent server information locally.
-- Roblox API host access is used to load public-server information, game player counts, and avatar thumbnails.
+- Roblox API host access is used to load public-server information and game player counts.
 - Content scripts run only on Roblox game pages.
 
 ## Notes
