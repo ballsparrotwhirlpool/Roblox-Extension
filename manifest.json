@@ -8,15 +8,24 @@
   ],
   "host_permissions": [
     "https://games.roblox.com/*",
-    "https://apis.roblox.com/*",
-    "https://thumbnails.roblox.com/*"
+    "https://apis.roblox.com/*"
   ],
   "background": {
     "service_worker": "service-worker.js"
   },
   "action": {
     "default_title": "Roblox Server Navigator settings",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "content_scripts": [
     {

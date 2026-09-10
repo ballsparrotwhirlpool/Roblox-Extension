@@ -74,10 +74,13 @@ async function fetchRobloxJson(url, options = {}, attempts = 5) {
       const response = await fetch(url, options);
       if (response.ok) return response.json();
       if (response.status !== 429 && response.status < 500) {
-        throw new Error(`Roblox returned error ${response.status}`);
+        const error = new Error(`Roblox returned error ${response.status}`);
+        error.nonRetryable = true;
+        throw error;
       }
       lastError = new Error(`Roblox returned error ${response.status}`);
     } catch (error) {
+      if (error.nonRetryable) throw error;
       lastError = error;
     }
     if (attempt < attempts - 1) {
@@ -144,52 +147,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success:true, server:null, capped:Boolean(cursor) });
       } catch (error) {
         sendResponse({ success:false, error:error.message });
-      }
-    })();
-    return true;
-  }
-
-  if (message.type === "GET_PLAYER_THUMBNAILS") {
-    const tokens = [...new Set(message.tokens || [])].slice(0, 100);
-    const requests = tokens.map((token, index) => ({
-      requestId: String(index),
-      token,
-      type: "AvatarHeadShot",
-      size: "150x150",
-      format: "png",
-      isCircular: false
-    }));
-    if (!requests.length) { sendResponse({ success: true, thumbnails: {} }); return; }
-    (async () => {
-      try {
-        const thumbnails = {};
-        let pendingRequests = requests;
-
-        for (let attempt = 0; attempt < 5 && pendingRequests.length; attempt += 1) {
-          if (attempt) await new Promise((resolve) => setTimeout(resolve, 450));
-          const response = await fetch("https://thumbnails.roblox.com/v1/batch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(pendingRequests)
-          });
-          if (!response.ok) throw new Error(`Roblox returned error ${response.status}`);
-
-          const result = await response.json();
-          const stillPending = new Set();
-          for (const item of result.data || []) {
-            const token = tokens[Number(item.requestId)];
-            if (token && item.state === "Completed" && item.imageUrl) {
-              thumbnails[token] = item.imageUrl;
-            } else if (item.state === "Pending") {
-              stillPending.add(item.requestId);
-            }
-          }
-          pendingRequests = requests.filter((request) => stillPending.has(request.requestId));
-        }
-
-        sendResponse({ success: true, thumbnails });
-      } catch (error) {
-        sendResponse({ success: false, error: error.message });
       }
     })();
     return true;

@@ -56,7 +56,17 @@ function rsnPublishCardServers() {
   if (servers.length) rsnPublishServers(servers);
 }
 
+function rsnIsPublicServerRequest(url) {
+  try {
+    const parsed = new URL(String(url), location.href);
+    return parsed.hostname === "games.roblox.com" && /\/v1\/games\/\d+\/servers\/Public$/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function rsnCaptureServerResponse(url, response) {
+  if (!rsnIsPublicServerRequest(url)) return;
   const contentType = response.headers?.get("content-type") || "";
   if (!contentType.includes("json")) return;
   response.clone().json().then((body) => {
@@ -68,7 +78,8 @@ function rsnCaptureServerResponse(url, response) {
 const rsnOriginalFetch = window.fetch;
 window.fetch = async function (...args) {
   const response = await rsnOriginalFetch.apply(this, args);
-  rsnCaptureServerResponse(args[0]?.url || args[0], response);
+  const url = args[0]?.url || args[0];
+  if (rsnIsPublicServerRequest(url)) rsnCaptureServerResponse(url, response);
   return response;
 };
 
@@ -80,6 +91,7 @@ XMLHttpRequest.prototype.open = function (method, url, ...rest) {
 const rsnOriginalSend = XMLHttpRequest.prototype.send;
 XMLHttpRequest.prototype.send = function (...args) {
   this.addEventListener("load", () => {
+    if (!rsnIsPublicServerRequest(this.__rsnUrl)) return;
     try {
       const servers = rsnServersFromBody(JSON.parse(this.responseText));
       if (servers.length) rsnPublishServers(servers);

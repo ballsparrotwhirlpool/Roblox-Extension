@@ -20,6 +20,7 @@ const themeLabel = themeToggle.querySelector(".theme-label");
 const themeKnob = themeToggle.querySelector(".theme-knob");
 let settings = { ...defaults };
 let serverCapacity = null;
+let activePlaceId = null;
 let undoSettings = null;
 let undoTimer = null;
 let statusTimer = null;
@@ -83,15 +84,20 @@ chrome.storage.local.get(SETTINGS_KEY, (result) => {
   syncUI();
 });
 
-chrome.storage.local.get(CAPACITY_KEY, (result) => {
-  const capacity = Number(result[CAPACITY_KEY]?.capacity);
-  serverCapacity = Number.isFinite(capacity) && capacity >= 0 ? capacity : null;
-  syncUI();
+chrome.tabs.query({ active:true, currentWindow:true }, ([tab]) => {
+  activePlaceId = tab?.url?.match(/^https:\/\/(?:www\.)?roblox\.com\/games\/(\d+)/i)?.[1] || null;
+  chrome.storage.local.get(CAPACITY_KEY, (result) => {
+    const record = result[CAPACITY_KEY];
+    const capacity = String(record?.placeId) === String(activePlaceId) ? Number(record?.capacity) : NaN;
+    serverCapacity = Number.isFinite(capacity) && capacity >= 0 ? capacity : null;
+    syncUI();
+  });
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local" || !changes[CAPACITY_KEY]) return;
-  const capacity = Number(changes[CAPACITY_KEY].newValue?.capacity);
+  const record = changes[CAPACITY_KEY].newValue;
+  const capacity = String(record?.placeId) === String(activePlaceId) ? Number(record?.capacity) : NaN;
   serverCapacity = Number.isFinite(capacity) && capacity >= 0 ? capacity : null;
   syncUI();
 });

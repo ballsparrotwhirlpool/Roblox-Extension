@@ -53,6 +53,7 @@ function applyFeatureVisibility() {
   setFeatureVisible(favoritesControl, featureSettings.favorites);
   setFeatureVisible(document.querySelector('#rsn-native-pager [data-jump="last"]'), featureSettings.totalControls && featureSettings.pagination);
   setFeatureVisible(document.querySelector('#rsn-native-pager [data-action="refresh"]'), featureSettings.totalControls);
+  setFeatureVisible(document.querySelector("#rsn-native-pager .rsn-total-status"), featureSettings.totalControls);
   setFeatureVisible(document.querySelector('#rsn-native-pager [data-action="clear-avoided"]'), featureSettings.avoid);
   document.querySelectorAll('[data-tool="favorite"]').forEach((element) => setFeatureVisible(element, featureSettings.favorites));
   document.querySelectorAll('[data-tool="avoid"]').forEach((element) => setFeatureVisible(element, featureSettings.avoid));
@@ -194,6 +195,8 @@ function addStyles() {
     .rsn-input { width:70px; height:38px; padding:0 9px; border:1px solid var(--rsn-border); border-radius:8px; background:var(--rsn-input); color:var(--rsn-text); }
     .rsn-status { color:var(--rsn-muted); font-size:12px; text-align:center; }
     .rsn-status:empty { display:none; }
+    .rsn-total-status { color:var(--rsn-muted); font-size:12px; text-align:center; }
+    .rsn-total-status:empty { display:none!important; }
     .rsn-filters,.rsn-navigation,.rsn-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; }
     .rsn-filters { gap:8px 12px; padding-bottom:2px; }
     .rsn-native-filter-row { justify-content:flex-start!important; width:100%!important; margin-top:8px!important; padding:0!important; }
@@ -211,6 +214,7 @@ function addStyles() {
     .rsn-server-search-input { flex:1 1 125px; min-width:120px; height:36px; padding:0 10px; border:1px solid var(--rsn-border); border-radius:7px; background:var(--rsn-input); color:var(--rsn-text); }
     .rsn-server-search .rsn-button { flex:0 0 auto; padding:0 10px; white-space:nowrap; font-weight:400; }
     .rsn-toolbar-favorites { flex:0 0 auto; margin-right:auto!important; margin-left:auto!important; white-space:nowrap; }
+    .rsn-exclude-full { transform:translateX(-8px); }
     .rsn-server-search-input:focus { border-color:#7d8491; outline:2px solid rgba(125,132,145,.25); outline-offset:1px; }
     .rsn-search-match { outline:2px solid #62c98b!important; outline-offset:3px; }
     .rsn-native-sort-row { display:flex!important; flex-wrap:nowrap!important; align-items:center!important; width:100%!important; gap:8px!important; }
@@ -297,8 +301,8 @@ function addStyles() {
   window.__rsnSyncPageTheme = syncPageTheme;
   syncPageTheme();
   const themeObserver = new MutationObserver(syncPageTheme);
-  themeObserver.observe(document.documentElement, { attributes:true, attributeFilter:["class","style","data-theme"] });
-  if (document.body) themeObserver.observe(document.body, { attributes:true, attributeFilter:["class","style","data-theme"] });
+  themeObserver.observe(document.documentElement, { attributes:true, attributeFilter:["class","data-theme"] });
+  if (document.body) themeObserver.observe(document.body, { attributes:true, attributeFilter:["class","data-theme"] });
 }
 
 function installRandomServerButton() {
@@ -520,7 +524,8 @@ function install(section) {
       <button class="rsn-button" data-action="refresh">Refresh total</button>
       <button class="rsn-button" data-action="clear-avoided">Clear avoided</button>
     </div>
-    <div class="rsn-status"></div>`;
+    <div class="rsn-status"></div>
+    <div class="rsn-total-status"></div>`;
   const serverSearch = pager.querySelector(".rsn-server-search");
   const filterBar = pager.querySelector(".rsn-filters");
   const minFilterInput = filterBar.querySelector('[data-filter="min"]');
@@ -534,6 +539,8 @@ function install(section) {
   const excludeFullLabel = [...section.querySelectorAll("label")].find((element) =>
     /exclude full servers/i.test(element.textContent || "")
   );
+  const excludeFullControl = excludeFullLabel?.closest(".checkbox") || excludeFullLabel?.parentElement;
+  excludeFullControl?.classList.add("rsn-exclude-full");
   let sortRow = excludeFullLabel?.parentElement;
   for (let depth = 0; sortRow && sortRow !== section && depth < 5; depth += 1, sortRow = sortRow.parentElement) {
     if (/sort by/i.test(sortRow.textContent || "") && /exclude full servers/i.test(sortRow.textContent || "")) break;
@@ -561,6 +568,16 @@ function install(section) {
   const label = pager.querySelector(".rsn-label");
   const input = pager.querySelector(".rsn-input");
   const status = pager.querySelector(".rsn-status");
+  const totalStatus = pager.querySelector(".rsn-total-status");
+  let statusClearTimer = null;
+  new MutationObserver(() => {
+    clearTimeout(statusClearTimer);
+    const message = status.textContent.trim();
+    if (!message || /^(loading|counting|finding|refreshing|searching)\b/i.test(message)) return;
+    statusClearTimer = setTimeout(() => {
+      status.textContent = "";
+    }, 2500);
+  }).observe(status, { childList:true, characterData:true, subtree:true });
   const serverSearchInput = serverSearch.querySelector("[data-search-server-id]");
   const joinFoundButton = serverSearch.querySelector('[data-action="server-join"]');
   const state = { page:1, total:null, capped:false, ended:false, busy:false, largeGame:false, playerCount:0 };
@@ -699,6 +716,12 @@ function install(section) {
   }
 
   function loadedPages() { return Math.max(1, Math.ceil(visibleCards().length / PAGE_SIZE)); }
+  function hasActiveLocalFilter(capacity = loadedServerCapacity()) {
+    const rangeFiltered = featureSettings.playerFilters && (
+      filters.min > 0 || (filters.max !== null && (capacity < 0 || filters.max < capacity))
+    );
+    return rangeFiltered || (featureSettings.favorites && filters.favoritesOnly);
+  }
   function hasMore() {
     const button = loadMoreButton(section);
     return Boolean(button && button.getAttribute("aria-disabled") !== "true");
@@ -737,7 +760,10 @@ function install(section) {
     const pageCards = usable.slice(start,start+PAGE_SIZE);
     pageCards.forEach((card) => card.style.display="");
     equalizeVisibleCardHeights();
-    const totalText = state.capped ? `${Math.max(TOTAL_BLOCK, Math.ceil(state.page/TOTAL_BLOCK)*TOTAL_BLOCK)}+` : state.total ?? "…";
+    const locallyFiltered = hasActiveLocalFilter(capacity);
+    const totalText = locallyFiltered
+      ? `${loadedPages()} loaded`
+      : state.capped ? `${Math.max(TOTAL_BLOCK, Math.ceil(state.page/TOTAL_BLOCK)*TOTAL_BLOCK)}+` : state.total ?? "…";
     label.textContent = `Page ${state.page} of ${totalText}`;
     input.value = state.page;
     [...pager.querySelectorAll("button")].forEach((button) => button.disabled = state.busy);
@@ -745,8 +771,8 @@ function install(section) {
       ? `Disabled because this game has ${state.playerCount.toLocaleString()} active players.`
       : "";
     for (const button of [pager.querySelector('[data-jump="last"]'), pager.querySelector('[data-action="refresh"]')]) {
-      button.disabled = state.busy || state.largeGame;
-      button.title = safetyMessage;
+      button.disabled = state.busy || state.largeGame || locallyFiltered;
+      button.title = locallyFiltered ? "Unavailable while a local server filter is active." : safetyMessage;
     }
   }
   window.addEventListener("rsn-feature-settings-changed", () => {
@@ -792,6 +818,11 @@ function install(section) {
   }
   async function total(force=false, exact=false) {
     if (state.largeGame) return;
+    if (hasActiveLocalFilter()) {
+      status.textContent = "Last-page totals are unavailable while a local filter is active.";
+      render();
+      return;
+    }
     if (!force) {
       const cached = await new Promise((resolve) => chrome.storage.local.get(totalKey, (data) => resolve(data[totalKey])));
       if (cached) { state.total=cached.pages; state.capped=cached.capped; render(); return; }
@@ -819,7 +850,9 @@ function install(section) {
       if (state.largeGame) {
         state.total = TOTAL_BLOCK;
         state.capped = true;
-        status.textContent = `Last and Refresh total button disabled for larger games (${result.playing.toLocaleString()} active players).`;
+        totalStatus.textContent = `Last and Refresh total button disabled for larger games (${result.playing.toLocaleString()} active players).`;
+      } else {
+        totalStatus.textContent = "";
       }
       render();
       return state.largeGame;
