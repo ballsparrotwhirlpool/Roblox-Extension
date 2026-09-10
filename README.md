@@ -31,7 +31,7 @@ The popup provides controls for:
 
 Changes are saved automatically and applied to an open Roblox page immediately. The feature counter and master control show one of three states:
 
-- **Active** — all 8 features are enabled
+- **Active** — all 9 features are enabled
 - **Mixed** — some features are enabled
 - **Off** — all features are disabled
 
