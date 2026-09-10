@@ -1,60 +1,43 @@
 const FEATURE_SETTINGS_KEY = "rsn-feature-settings";
-const ICON_FEATURES = ["randomServer", "rejoinServer", "pagination", "playerFilters", "totalControls", "favorites", "avoid", "copyId"];
+const ICON_FEATURES = ["randomServer", "rejoinServer", "pagination", "serverIdSearch", "playerFilters", "totalControls", "favorites", "avoid", "copyId"];
 const ICON_DEFAULTS = Object.fromEntries(ICON_FEATURES.map((feature) => [feature, true]));
 let robloxIcon = null;
 
-function drawToolbarIcon(size, color) {
+function drawToolbarIcon(size, state) {
   const canvas = new OffscreenCanvas(size, size);
   const context = canvas.getContext("2d");
-  const inset = Math.max(1, Math.round(size * .06));
-  const radius = Math.round(size * .24);
-  const left = inset;
-  const top = inset;
-  const right = size - inset;
-  const bottom = size - inset;
-
-  context.beginPath();
-  context.moveTo(left + radius, top);
-  context.lineTo(right - radius, top);
-  context.quadraticCurveTo(right, top, right, top + radius);
-  context.lineTo(right, bottom - radius);
-  context.quadraticCurveTo(right, bottom, right - radius, bottom);
-  context.lineTo(left + radius, bottom);
-  context.quadraticCurveTo(left, bottom, left, bottom - radius);
-  context.lineTo(left, top + radius);
-  context.quadraticCurveTo(left, top, left + radius, top);
-  context.closePath();
-  context.fillStyle = color;
-  context.fill();
-
-  context.fillStyle = "#ffffff";
-  const unit = size / 16;
-  context.fillRect(4 * unit, 3 * unit, 2 * unit, 10 * unit);
-  context.fillRect(6 * unit, 3 * unit, 4 * unit, 2 * unit);
-  context.fillRect(6 * unit, 7 * unit, 4 * unit, 2 * unit);
-  context.fillRect(9 * unit, 4 * unit, 2 * unit, 4 * unit);
-  context.beginPath();
-  context.moveTo(7 * unit, 8 * unit);
-  context.lineTo(11 * unit, 13 * unit);
-  context.lineWidth = 2 * unit;
-  context.lineCap = "square";
-  context.strokeStyle = "#ffffff";
-  context.stroke();
+  const scale = size / 16;
+  const bars = [
+    { state:"active", color:"#39a66d", muted:"#68746d" },
+    { state:"mixed", color:"#d1841f", muted:"#776f64" },
+    { state:"off", color:"#cf514b", muted:"#756766" }
+  ];
+  bars.forEach((bar,index) => {
+    const x = 2 * scale;
+    const y = (2 + index * 5) * scale;
+    const width = 12 * scale;
+    const height = 3 * scale;
+    const radius = 1.5 * scale;
+    context.beginPath();
+    context.roundRect(x,y,width,height,radius);
+    context.fillStyle = state === bar.state ? bar.color : bar.muted;
+    context.fill();
+  });
   return context.getImageData(0, 0, size, size);
 }
 
 function updateToolbarIcon(savedSettings = {}) {
   const settings = { ...ICON_DEFAULTS, ...savedSettings };
   const active = ICON_FEATURES.filter((feature) => settings[feature] !== false).length;
-  const color = active === ICON_FEATURES.length ? "#2f7654" : active === 0 ? "#c7504a" : "#d1841f";
+  const state = active === ICON_FEATURES.length ? "active" : active === 0 ? "off" : "mixed";
   robloxIcon = {
-    16: drawToolbarIcon(16, color),
-    32: drawToolbarIcon(32, color)
+    16: drawToolbarIcon(16, state),
+    32: drawToolbarIcon(32, state)
   };
   chrome.action.setIcon({
     imageData: {
-      16: drawToolbarIcon(16, "#c7504a"),
-      32: drawToolbarIcon(32, "#c7504a")
+      16: drawToolbarIcon(16, "off"),
+      32: drawToolbarIcon(32, "off")
     }
   });
   chrome.action.setTitle({ title:`Roblox Server Navigator — ${active} of ${ICON_FEATURES.length} active` });
@@ -78,8 +61,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   chrome.action.setIcon({
     tabId,
     imageData: {
-      16: drawToolbarIcon(16, "#c7504a"),
-      32: drawToolbarIcon(32, "#c7504a")
+      16: drawToolbarIcon(16, "off"),
+      32: drawToolbarIcon(32, "off")
     }
   });
 });

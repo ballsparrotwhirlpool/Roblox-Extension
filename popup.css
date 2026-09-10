@@ -2,7 +2,7 @@
 * { box-sizing:border-box; }
 html { overflow:hidden; }
 button,input { font:inherit; }
-body { width:360px; margin:0; overflow:hidden; background:var(--bg); color:var(--ink); }
+body { width:400px; margin:0; overflow:hidden; background:var(--bg); color:var(--ink); }
 main { padding:10px 16px 8px; }
 header { display:flex; align-items:center; justify-content:space-between; padding:0 2px 8px; border-bottom:1px solid var(--line); }
 h1 { margin:0; font-size:17px; line-height:1.2; letter-spacing:-.02em; }
@@ -18,6 +18,10 @@ section { margin-top:8px; }
 h2 { margin:0; color:#4d534c; font-size:11px; font-weight:750; letter-spacing:.07em; text-transform:uppercase; }
 .section-heading>span { color:#949990; font-size:10px; }
 .settings-list,.play-grid { overflow:hidden; border:1px solid var(--line); border-radius:6px; background:var(--surface); }
+.browser-toggle-grid { display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid #e7eaee; }
+.browser-toggle-grid .setting-row { min-width:0; border-bottom:0; }
+.browser-toggle-grid .setting-row:first-child { border-right:1px solid #e7eaee; }
+.browser-toggle-grid .setting-row>span { min-width:0; }
 .setting-row { display:flex; align-items:center; justify-content:space-between; min-height:42px; padding:5px 11px; border-bottom:1px solid #e7eaee; cursor:pointer; }
 .setting-row:last-child { border-bottom:0; }
 .setting-row strong,.range-copy strong,.copy-action strong { display:block; font-size:12.5px; font-weight:650; }
@@ -72,6 +76,8 @@ footer { display:flex; align-items:center; gap:8px; margin-top:8px; padding-top:
 [data-theme="dark"] { color-scheme:dark; --bg:#111214; --surface:#1c1d20; --ink:#f1f2f4; --muted:#a0a4aa; --line:#36383d; --green:#46a875; --green-soft:#203a2b; --red:#df665f; --red-soft:#432523; --amber:#e0a34b; --amber-soft:#3a2d1b; }
 [data-theme="dark"] h2 { color:#c4c7cc; }
 [data-theme="dark"] .setting-row,[data-theme="dark"] .range-setting { border-bottom-color:#2d2f34; }
+[data-theme="dark"] .browser-toggle-grid { border-bottom-color:#2d2f34; }
+[data-theme="dark"] .browser-toggle-grid .setting-row:first-child { border-right-color:#2d2f34; }
 [data-theme="dark"] .primary-section .setting-row:first-child,[data-theme="dark"] .tool-row label:first-child { border-right-color:#2d2f34; }
 [data-theme="dark"] .range-fields input { border-color:#41444a; background:#141518; color:var(--ink); }
 [data-theme="dark"] #reset-player-range { border-color:#41444a; background:#24262a; }

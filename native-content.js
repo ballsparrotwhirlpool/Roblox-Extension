@@ -9,6 +9,7 @@ const DEFAULT_FEATURE_SETTINGS = {
   randomServer:true,
   rejoinServer:true,
   pagination:true,
+  serverIdSearch:true,
   playerFilters:true,
   minPlayers:0,
   maxPlayers:null,
@@ -40,6 +41,7 @@ function applyFeatureVisibility() {
   document.querySelectorAll("#rsn-native-pager .rsn-page-jump-control").forEach((element) =>
     setFeatureVisible(element, featureSettings.pagination)
   );
+  setFeatureVisible(document.querySelector(".rsn-server-search"), featureSettings.serverIdSearch);
   const favoritesInput = document.querySelector('[data-filter="favorites"]');
   const favoritesControl = favoritesInput?.closest(".rsn-toolbar-favorites") || favoritesInput?.closest("label");
   const favoritesInsidePager = Boolean(favoritesControl?.closest("#rsn-native-pager"));
@@ -205,7 +207,7 @@ function addStyles() {
     .rsn-filter-field,.rsn-filter-check { display:flex; align-items:center; gap:6px; margin:0; color:var(--rsn-text); font-size:13px; font-weight:600; }
     .rsn-filter-input { width:74px; height:32px; padding:0 8px; border:1px solid var(--rsn-border); border-radius:7px; background:var(--rsn-input); color:var(--rsn-text); }
     .rsn-filter-check input { width:16px; height:16px; margin:0; }
-    .rsn-server-search { display:flex; flex:0 0 340px; flex-wrap:nowrap; align-items:center; align-self:center; justify-content:flex-end; gap:8px; margin-left:0; }
+    .rsn-server-search { display:flex; flex:0 0 340px; flex-wrap:nowrap; align-items:center; align-self:center; justify-content:flex-end; gap:8px; margin-left:auto; }
     .rsn-server-search-input { flex:1 1 125px; min-width:120px; height:36px; padding:0 10px; border:1px solid var(--rsn-border); border-radius:7px; background:var(--rsn-input); color:var(--rsn-text); }
     .rsn-server-search .rsn-button { flex:0 0 auto; padding:0 10px; white-space:nowrap; font-weight:400; }
     .rsn-toolbar-favorites { flex:0 0 auto; margin-right:auto!important; margin-left:auto!important; white-space:nowrap; }

@@ -1,7 +1,7 @@
 const SETTINGS_KEY = "rsn-feature-settings";
 const THEME_KEY = "rsn-popup-theme";
 const CAPACITY_KEY = "rsn-current-server-capacity";
-const defaults = { randomServer:true, rejoinServer:true, pagination:true, playerFilters:true, minPlayers:0, maxPlayers:null, totalControls:true, favorites:true, avoid:true, copyId:true };
+const defaults = { randomServer:true, rejoinServer:true, pagination:true, serverIdSearch:true, playerFilters:true, minPlayers:0, maxPlayers:null, totalControls:true, favorites:true, avoid:true, copyId:true };
 const switches = [...document.querySelectorAll("input[data-feature]")];
 const playerFilterToggle = document.querySelector("#player-filter-toggle");
 const playerFilterControl = document.querySelector("#player-filter-control");
@@ -157,7 +157,7 @@ copyAction.addEventListener("click", () => {
 toggleAll.addEventListener("click", () => {
   undoSettings = { ...settings };
   const enableAll = !featureValues().every(Boolean);
-  for (const key of ["randomServer","rejoinServer","pagination","playerFilters","totalControls","favorites","avoid","copyId"]) settings[key] = enableAll;
+  for (const key of ["randomServer","rejoinServer","pagination","serverIdSearch","playerFilters","totalControls","favorites","avoid","copyId"]) settings[key] = enableAll;
   saveSettings();
   showUndo(enableAll ? "All features on" : "All features off");
 });
