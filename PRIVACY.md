@@ -25,7 +25,7 @@ Preferences and saved server IDs are stored locally on the user's device using C
 
 Roblox Server Navigator does not sell user data, transfer user data to advertisers, or use data for advertising, profiling, lending, or purposes unrelated to its server-navigation features.
 
-The extension communicates only with official Roblox HTTPS services at `games.roblox.com` and `apis.roblox.com` to request public game and server information and to perform user-requested server actions. The developer does not operate an external data-collection server and does not receive this information.
+The extension communicates only with official Roblox HTTPS services at `games.roblox.com`, `apis.roblox.com`, and `thumbnails.roblox.com` to request public game and server information, resolve public-server player tokens into avatar thumbnails for the currently visible server cards, and perform user-requested server actions. The developer does not operate an external data-collection server and does not receive this information.
 
 ## Data retention and deletion
 
