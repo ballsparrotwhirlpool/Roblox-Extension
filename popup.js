@@ -157,7 +157,7 @@ playerFilterToggle.addEventListener("click", () => {
 copyAction.addEventListener("click", () => {
   dismissUndo();
   settings.copyId = !settings.copyId;
-  saveSettings(settings.copyId ? "Copy action added to cards" : "Copy action hidden from cards");
+  saveSettings(settings.copyId ? "Copy tools added to cards" : "Copy tools hidden from cards");
 });
 
 toggleAll.addEventListener("click", () => {

@@ -59,7 +59,7 @@ function applyFeatureVisibility() {
   setFeatureVisible(document.querySelector('#rsn-native-pager [data-action="clear-avoided"]'), featureSettings.avoid);
   document.querySelectorAll('[data-tool="favorite"]').forEach((element) => setFeatureVisible(element, featureSettings.favorites));
   document.querySelectorAll('[data-tool="avoid"]').forEach((element) => setFeatureVisible(element, featureSettings.avoid));
-  document.querySelectorAll('[data-tool="copy"]').forEach((element) => setFeatureVisible(element, featureSettings.copyId));
+  document.querySelectorAll('[data-tool="copy"],[data-tool="copy-link"]').forEach((element) => setFeatureVisible(element, featureSettings.copyId));
   document.querySelectorAll(".rsn-card-tools").forEach((row) => {
     const hasVisibleButton = [...row.querySelectorAll("button")].some((button) => button.style.display !== "none");
     setFeatureVisible(row, hasVisibleButton);
@@ -240,6 +240,7 @@ function addStyles() {
     #rsn-rejoin-message { position:fixed; z-index:100000; max-width:290px; padding:12px 14px; border:1px solid var(--rsn-border); border-radius:8px; background:var(--rsn-surface); color:var(--rsn-text); box-shadow:0 8px 24px rgba(0,0,0,.28); font-size:13px; line-height:1.35; }
     .rsn-card-tools { display:flex; align-items:center; gap:5px; margin:6px 0; }
     .rsn-card-tool { height:24px; padding:0 7px; border:1px solid var(--rsn-border); border-radius:6px; background:var(--rsn-button); color:var(--rsn-text); cursor:pointer; font-size:12px; }
+    .rsn-card-tool[data-tool="copy"],.rsn-card-tool[data-tool="copy-link"] { padding:0 5px; font-size:10px; white-space:nowrap; }
     .rsn-card-tool.rsn-on { color:#ffd75e; }
     .rsn-card-tool.rsn-avoided { background:#51272c; color:#ff6b72; box-shadow:inset 0 0 0 1px #784047; }
     .rsn-card-tool.rsn-copied { background:#24543a; color:#83e3a9; box-shadow:inset 0 0 0 1px #347452; }
@@ -651,7 +652,7 @@ function install(section) {
       let tools = details.querySelector(".rsn-card-tools");
       if (!tools) {
         tools=document.createElement("div"); tools.className="rsn-card-tools";
-        tools.innerHTML='<button class="rsn-card-tool" data-tool="favorite">☆</button><button class="rsn-card-tool" data-tool="avoid">⊘</button><button class="rsn-card-tool" data-tool="copy">Copy ID</button>';
+        tools.innerHTML='<button class="rsn-card-tool" data-tool="favorite">☆</button><button class="rsn-card-tool" data-tool="avoid">⊘</button><button class="rsn-card-tool" data-tool="copy">Copy ID</button><button class="rsn-card-tool" data-tool="copy-link">Copy Link</button>';
         idElement.insertAdjacentElement("beforebegin", tools);
       }
       tools.dataset.id=id;
@@ -820,7 +821,7 @@ function install(section) {
     tools.className = "rsn-card-tools";
     tools.dataset.id = server.id;
     tools.dataset.fullId = server.id;
-    tools.innerHTML = '<button class="rsn-card-tool" data-tool="favorite">☆</button><button class="rsn-card-tool" data-tool="avoid">⊘</button><button class="rsn-card-tool" data-tool="copy">Copy ID</button>';
+    tools.innerHTML = '<button class="rsn-card-tool" data-tool="favorite">☆</button><button class="rsn-card-tool" data-tool="avoid">⊘</button><button class="rsn-card-tool" data-tool="copy">Copy ID</button><button class="rsn-card-tool" data-tool="copy-link">Copy Link</button>';
     const favorite = tools.querySelector('[data-tool="favorite"]');
     favorite.textContent = hasSaved(favorites,server.id) ? "★" : "☆";
     favorite.classList.toggle("rsn-on",hasSaved(favorites,server.id));
@@ -1076,19 +1077,28 @@ function install(section) {
       if(hasSaved(avoided,id)){avoided.delete(id);avoided.delete(short);}else avoided.add(id);
       chrome.storage.local.set({[avoidKey]:[...avoided]});render();
     }
-    if(tool.dataset.tool==="copy"){
+    if(tool.dataset.tool==="copy" || tool.dataset.tool==="copy-link"){
       clearTimeout(copyResetTimers.get(tool));
+      const copiesJoinLink = tool.dataset.tool === "copy-link";
+      const fullServerId = row.dataset.fullId || id;
+      const defaultLabel = copiesJoinLink ? "Copy Link" : "Copy ID";
       try{
-        await navigator.clipboard.writeText(row.dataset.fullId||id);
-        tool.textContent="Copied!";
+        if (copiesJoinLink && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fullServerId)) {
+          throw new Error("Full server ID unavailable");
+        }
+        const value = copiesJoinLink
+          ? `roblox://experiences/start?placeId=${encodeURIComponent(getPlaceId())}&gameInstanceId=${encodeURIComponent(fullServerId)}`
+          : fullServerId;
+        await navigator.clipboard.writeText(value);
+        tool.textContent=copiesJoinLink?"Link copied!":"Copied!";
         tool.classList.add("rsn-copied");
-        status.textContent="Server ID copied.";
+        status.textContent=copiesJoinLink?"Server join link copied.":"Server ID copied.";
       }catch{
         tool.textContent="Try again";
         tool.classList.remove("rsn-copied");
-        status.textContent="Could not copy server ID.";
+        status.textContent=copiesJoinLink?"Could not copy a join link for this server.":"Could not copy server ID.";
       }
-      copyResetTimers.set(tool,setTimeout(()=>{tool.textContent="Copy ID";tool.classList.remove("rsn-copied");copyResetTimers.delete(tool);},1400));
+      copyResetTimers.set(tool,setTimeout(()=>{tool.textContent=defaultLabel;tool.classList.remove("rsn-copied");copyResetTimers.delete(tool);},1400));
     }
   },true);
 
