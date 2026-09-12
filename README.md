@@ -7,12 +7,13 @@ A Chrome extension that adds faster navigation, player filters, card tools, and 
 - Browse lightweight server cards in pages of 8, backed by cached 100-server API batches.
 - Move backward or forward by 1, 10, or 100 pages.
 - Jump to a custom page, the first page, or the last page.
-- Search for a server using its full ID or the shortened ID shown on a card.
+- Join a server using its full ID or a shortened ID that can be resolved from loaded/API results.
 - Filter loaded servers by minimum and maximum player count.
 - Limit the Maximum field to the current game's detected server capacity.
 - Favorite servers for quick visual reference.
 - Mark servers to avoid without removing their cards; marked Avoid buttons turn red.
 - Copy a server ID with temporary **Copied!** feedback.
+- Copy a `roblox://` join link for a specific server.
 - Join a random available server.
 - Rejoin the last server selected through Random or a server's Join button.
 - Show player counts, capacity, server IDs, and cached player icons while fetching avatars only for the visible page.
@@ -27,7 +28,7 @@ The popup provides controls for:
 - Page navigation
 - Minimum and maximum player filters
 - Last-page and total-count controls
-- Favorites, Avoid, and Copy ID
+- Favorites, Avoid, Copy ID, and Copy Join Link
 
 Changes are saved automatically and applied to an open Roblox page immediately. The feature counter and master control show one of three states:
 
