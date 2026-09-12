@@ -91,6 +91,27 @@ function getPlaceId() {
   return location.pathname.match(/^\/games\/(\d+)/)?.[1] || null;
 }
 
+function compactServerId(serverId) {
+  const id = String(serverId || "").trim().toLowerCase();
+  return id.length > 8 ? `${id.slice(0,4)}-${id.slice(-4)}` : id;
+}
+
+function readAvoidedServers(placeId = getPlaceId()) {
+  const key = `rsn-avoided-${placeId}`;
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(key, (data) => {
+      const error = chrome.runtime.lastError;
+      if (error) return reject(new Error(error.message));
+      resolve(new Set((Array.isArray(data[key]) ? data[key] : []).map((id) => String(id).trim().toLowerCase())));
+    });
+  });
+}
+
+function serverIsAvoided(avoided, serverId) {
+  const id = String(serverId || "").trim().toLowerCase();
+  return avoided.has(id) || avoided.has(compactServerId(id));
+}
+
 function exactText(root, selector, text) {
   return [...root.querySelectorAll(selector)].filter(
     (element) => element.textContent.trim().toLowerCase() === text.toLowerCase()
@@ -370,11 +391,11 @@ function installRandomServerButton() {
     lastButton.classList.toggle("rsn-unavailable", !available);
     lastButton.setAttribute("aria-disabled", String(!available));
   };
-  const showRejoinMessage = () => {
+  const showRejoinMessage = (text = "The main Play button won't save your previously joined server. Use Random Server or a server's Join button instead.") => {
     document.querySelector("#rsn-rejoin-message")?.remove();
     const message = document.createElement("div");
     message.id = "rsn-rejoin-message";
-    message.textContent = "The main Play button won't save your previously joined server. Use Random Server or a server's Join button instead.";
+    message.textContent = text;
     document.body.appendChild(message);
     const rect = lastButton.getBoundingClientRect();
     message.style.left = `${Math.max(10, Math.min(innerWidth - message.offsetWidth - 10, rect.left))}px`;
@@ -422,8 +443,11 @@ function installRandomServerButton() {
         cursor: null,
         limit: 100
       });
-      const available = result.servers.filter((server) => server.playing < server.maxPlayers);
-      if (!available.length) throw new Error("No available public servers were found.");
+      const avoided = await readAvoidedServers();
+      const available = result.servers.filter((server) =>
+        server.playing < server.maxPlayers && !serverIsAvoided(avoided, server.id)
+      );
+      if (!available.length) throw new Error("No non-avoided public servers were found.");
       const server = available[Math.floor(Math.random() * available.length)];
       chrome.storage.local.set({ [lastServerKey]: server.id }, () => {
         setLastAvailable(true);
@@ -444,10 +468,22 @@ function installRandomServerButton() {
     setLastAvailable(Boolean(result[lastServerKey]));
   });
   lastButton.addEventListener("click", () => {
-    chrome.storage.local.get(lastServerKey, (result) => {
+    chrome.storage.local.get(lastServerKey, async (result) => {
       const serverId = result[lastServerKey];
       if (!serverId) {
         showRejoinMessage();
+        return;
+      }
+      try {
+        const avoided = await readAvoidedServers();
+        if (serverIsAvoided(avoided, serverId)) {
+          lastButton.title = "This server is on your Avoid list";
+          showRejoinMessage("This server is on your Avoid list. Remove its Avoid mark before rejoining.");
+          return;
+        }
+      } catch (error) {
+        lastButton.title = `Could not check Avoid list: ${error.message}`;
+        showRejoinMessage("Could not check your Avoid list. Please try again.");
         return;
       }
       window.dispatchEvent(new CustomEvent("rsn-join-game-instance", {
@@ -618,8 +654,8 @@ function install(section) {
   window.dispatchEvent(new CustomEvent("rsn-request-native-server-data"));
 
   chrome.storage.local.get([favoriteKey, avoidKey, filterKey], (data) => {
-    (data[favoriteKey] || []).forEach((id) => favorites.add(id));
-    (data[avoidKey] || []).forEach((id) => avoided.add(id));
+    replaceSaved(favorites, data[favoriteKey]);
+    replaceSaved(avoided, data[avoidKey]);
     const saved = data[filterKey] || {};
     filters.min = saved.min === undefined ? filters.min : Math.max(0, Number(saved.min) || 0);
     filters.max = saved.max === undefined
@@ -630,6 +666,20 @@ function install(section) {
     maxFilterInput.value = filters.max ?? "";
     favoritesInput.checked = filters.favoritesOnly;
     render();
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    let changed = false;
+    if (changes[favoriteKey]) {
+      replaceSaved(favorites, changes[favoriteKey].newValue);
+      changed = true;
+    }
+    if (changes[avoidKey]) {
+      replaceSaved(avoided, changes[avoidKey].newValue);
+      changed = true;
+    }
+    if (changed) render();
   });
 
   function shortId(card) { return card.textContent.match(/\bID\s*:\s*([0-9a-f]{4}-[0-9a-f]{4})\b/i)?.[1]?.toLowerCase() || null; }
@@ -678,8 +728,8 @@ function install(section) {
           }
         }
       }
-      const favorite=tools.querySelector('[data-tool="favorite"]'); favorite.textContent=favorites.has(id)?"★":"☆"; favorite.classList.toggle("rsn-on",favorites.has(id));
-      const avoid=tools.querySelector('[data-tool="avoid"]'); avoid.classList.toggle("rsn-avoided",avoided.has(id)); avoid.setAttribute("aria-pressed",String(avoided.has(id))); avoid.title=avoided.has(id)?"Remove avoid mark":"Mark server to avoid";
+      const favorite=tools.querySelector('[data-tool="favorite"]'); favorite.textContent=hasSaved(favorites,id)?"★":"☆"; favorite.classList.toggle("rsn-on",hasSaved(favorites,id));
+      const avoid=tools.querySelector('[data-tool="avoid"]'); avoid.classList.toggle("rsn-avoided",hasSaved(avoided,id)); avoid.setAttribute("aria-pressed",String(hasSaved(avoided,id))); avoid.title=hasSaved(avoided,id)?"Remove avoid mark":"Mark server to avoid";
       const info=serverInfo.get(id);
       if(info?.id) tools.dataset.fullId=info.id;
     });
@@ -734,8 +784,41 @@ function install(section) {
   function shortServerId(id) {
     return `${id.slice(0,4)}-${id.slice(-4)}`;
   }
+  function replaceSaved(set, values) {
+    set.clear();
+    for (const value of Array.isArray(values) ? values : []) {
+      const id = normalizeServerId(value);
+      if (id) set.add(id);
+    }
+  }
   function hasSaved(set,id) {
-    return set.has(id) || set.has(shortServerId(id).toLowerCase());
+    const normalized = normalizeServerId(id);
+    return set.has(normalized) || set.has(shortServerId(normalized));
+  }
+  async function toggleSaved(storageKey, set, id) {
+    const normalized = normalizeServerId(id);
+    const short = shortServerId(normalized);
+    const saved = await new Promise((resolve, reject) => {
+      chrome.storage.local.get(storageKey, (data) => {
+        const error = chrome.runtime.lastError;
+        if (error) reject(new Error(error.message));
+        else resolve(data[storageKey]);
+      });
+    });
+    replaceSaved(set, saved);
+    if (hasSaved(set, normalized)) {
+      set.delete(normalized);
+      set.delete(short);
+    } else {
+      set.add(normalized);
+    }
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.set({ [storageKey]:[...set] }, () => {
+        const error = chrome.runtime.lastError;
+        if (error) reject(new Error(error.message));
+        else resolve();
+      });
+    });
   }
   function showThumbnail(token,imageUrl) {
     if (!imageUrl) return;
@@ -816,7 +899,9 @@ function install(section) {
     join.type = "button";
     join.textContent = "Join";
     join.dataset.serverId = server.id;
-    join.disabled = Number(server.playing) >= Number(server.maxPlayers);
+    const isAvoided = hasSaved(avoided,server.id);
+    join.disabled = Number(server.playing) >= Number(server.maxPlayers) || isAvoided;
+    join.title = isAvoided ? "Remove this server from Avoid before joining" : "Join this server";
     const tools = document.createElement("div");
     tools.className = "rsn-card-tools";
     tools.dataset.id = server.id;
@@ -1000,6 +1085,10 @@ function install(section) {
     const usable = visibleServers();
     const index = usable.findIndex((server) => matchesServerId(server.id,query));
     if (index >= 0) {
+      if (hasSaved(avoided, usable[index].id)) {
+        status.textContent = "This server is on your Avoid list. Remove its Avoid mark before joining.";
+        return;
+      }
       state.page = Math.floor(index / PAGE_SIZE) + 1;
       render();
       const loadedMatch = [...apiGrid.querySelectorAll(".rsn-api-card")].find((card) => matchesServerId(card.dataset.rsnServerId,query));
@@ -1012,6 +1101,10 @@ function install(section) {
     }
 
     if (query.length === 36) {
+      if (hasSaved(avoided, query)) {
+        status.textContent = "This server is on your Avoid list. Remove its Avoid mark before joining.";
+        return;
+      }
       launchServerById(query);
       status.textContent = "Joining server…";
       return;
@@ -1027,6 +1120,10 @@ function install(section) {
       }
       if (result.server.playing >= result.server.maxPlayers) {
         status.textContent = "That server is currently full.";
+        return;
+      }
+      if (hasSaved(avoided, result.server.id)) {
+        status.textContent = "This server is on your Avoid list. Remove its Avoid mark before joining.";
         return;
       }
       launchServerById(result.server.id);
@@ -1060,6 +1157,12 @@ function install(section) {
     const joinButton = event.target.closest(".rsn-api-join");
     if (joinButton?.dataset.serverId) {
       const serverId = joinButton.dataset.serverId;
+      if (hasSaved(avoided, serverId)) {
+        event.preventDefault();
+        event.stopPropagation();
+        status.textContent = "This server is on your Avoid list. Remove its Avoid mark before joining.";
+        return;
+      }
       chrome.storage.local.set({ [`rsn-last-server-${getPlaceId()}`]:serverId });
       window.dispatchEvent(new CustomEvent("rsn-join-game-instance", { detail:{ placeId:getPlaceId(),serverId } }));
       return;
@@ -1068,14 +1171,24 @@ function install(section) {
     event.preventDefault();event.stopPropagation();
     const row=tool.closest(".rsn-card-tools");const id=row?.dataset.id;if(!id)return;
     if(tool.dataset.tool==="favorite"){
-      const short=shortServerId(id).toLowerCase();
-      if(hasSaved(favorites,id)){favorites.delete(id);favorites.delete(short);}else favorites.add(id);
-      chrome.storage.local.set({[favoriteKey]:[...favorites]});render();
+      tool.disabled = true;
+      try {
+        await toggleSaved(favoriteKey, favorites, row.dataset.fullId || id);
+        render();
+      } catch (error) {
+        status.textContent = `Could not save favorite: ${error.message}`;
+        tool.disabled = false;
+      }
     }
     if(tool.dataset.tool==="avoid"){
-      const short=shortServerId(id).toLowerCase();
-      if(hasSaved(avoided,id)){avoided.delete(id);avoided.delete(short);}else avoided.add(id);
-      chrome.storage.local.set({[avoidKey]:[...avoided]});render();
+      tool.disabled = true;
+      try {
+        await toggleSaved(avoidKey, avoided, row.dataset.fullId || id);
+        render();
+      } catch (error) {
+        status.textContent = `Could not save avoid mark: ${error.message}`;
+        tool.disabled = false;
+      }
     }
     if(tool.dataset.tool==="copy" || tool.dataset.tool==="copy-link"){
       clearTimeout(copyResetTimers.get(tool));
