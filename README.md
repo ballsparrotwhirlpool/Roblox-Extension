@@ -4,7 +4,7 @@ A Chrome extension that adds faster navigation, player filters, card tools, and 
 
 ## Features
 
-- Browse servers in pages of 8.
+- Browse lightweight server cards in pages of 8, backed by cached 100-server API batches.
 - Move backward or forward by 1, 10, or 100 pages.
 - Jump to a custom page, the first page, or the last page.
 - Search for a server using its full ID or the shortened ID shown on a card.
@@ -13,9 +13,9 @@ A Chrome extension that adds faster navigation, player filters, card tools, and 
 - Favorite servers for quick visual reference.
 - Mark servers to avoid without removing their cards; marked Avoid buttons turn red.
 - Copy a server ID with temporary **Copied!** feedback.
-- Join a random server while favoring lower-ping choices.
+- Join a random available server.
 - Rejoin the last server selected through Random or a server's Join button.
-- Show Roblox player avatars on server cards.
+- Show player counts, capacity, server IDs, and cached player icons while fetching avatars only for the visible page.
 - Enable or disable each feature from the extension popup.
 
 ## Popup
@@ -23,7 +23,7 @@ A Chrome extension that adds faster navigation, player filters, card tools, and 
 The popup provides controls for:
 
 - Random and Rejoin buttons
-- Server ID search with loaded-card highlighting and direct Join
+- Join by full server ID immediately, or resolve a shortened loaded/API server ID before joining
 - Page navigation
 - Minimum and maximum player filters
 - Last-page and total-count controls
@@ -70,11 +70,11 @@ After changing extension files, select **Reload** on the extension's card and re
 
 ## Notes
 
-- Min/Max filters apply only to servers Roblox has already loaded; they do not search every active server.
-- Server ID search checks loaded cards first, then searches up to 10,000 public servers through the Roblox API.
+- Min/Max filters apply to the API server batches loaded by the extension. Moving farther through filtered results automatically loads additional batches as needed.
+- Join by server ID launches full IDs immediately. Short IDs check loaded cards first, then search the public-server results Roblox makes available.
 - Open or refresh a Roblox game page before using the popup so the current server capacity can be detected.
 - Favorite and Avoid marks refer to individual server instances and may become irrelevant after a server closes.
 - **Clear avoided** removes all Avoid marks for the current game.
 - The standard Roblox Play button cannot remember a specific server. Use Random or a server card's Join button before using Rejoin.
-- Exact ping cannot be shown reliably on Roblox's personalized native server cards because matching ping information is not exposed.
+- The public-server API's `ping` value is not shown because it does not represent the installing user's in-game latency.
 - Last-page counting is disabled for very large games to avoid slow or failed requests.
