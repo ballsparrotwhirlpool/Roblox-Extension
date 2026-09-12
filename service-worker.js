@@ -47,7 +47,22 @@ function refreshToolbarIcon() {
   chrome.storage.local.get(FEATURE_SETTINGS_KEY, (result) => updateToolbarIcon(result[FEATURE_SETTINGS_KEY] || {}));
 }
 
-chrome.runtime.onInstalled.addListener(refreshToolbarIcon);
+function cleanRemovedRefreshSettings() {
+  chrome.storage.local.get(null, (data) => {
+    const settings = { ...(data[FEATURE_SETTINGS_KEY] || {}) };
+    if (Object.hasOwn(settings,"autoRefresh")) {
+      delete settings.autoRefresh;
+      chrome.storage.local.set({ [FEATURE_SETTINGS_KEY]:settings });
+    }
+    const obsoleteKeys = Object.keys(data).filter((key) => key.startsWith("rsn-watched-server-"));
+    if (obsoleteKeys.length) chrome.storage.local.remove(obsoleteKeys);
+  });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  refreshToolbarIcon();
+  cleanRemovedRefreshSettings();
+});
 chrome.runtime.onStartup.addListener(refreshToolbarIcon);
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes[FEATURE_SETTINGS_KEY]) {
@@ -192,6 +207,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "GET_PLAYER_THUMBNAILS") {
+    (async () => {
+      try {
+        const tokens = [...new Set((message.tokens || []).map(String).filter(Boolean))].slice(0, 100);
+        if (!tokens.length) {
+          sendResponse({ success:true,thumbnails:[] });
+          return;
+        }
+        const tokenByRequestId = new Map();
+        const body = tokens.map((token,index) => {
+          const requestId = `rsn-${index}`;
+          tokenByRequestId.set(requestId,token);
+          return {
+            requestId,
+            type:"AvatarHeadShot",
+            targetId:0,
+            token,
+            format:"png",
+            size:"150x150"
+          };
+        });
+        const data = await fetchRobloxJson("https://thumbnails.roblox.com/v1/batch",{
+          method:"POST",
+          headers:{ "Content-Type":"application/json",Accept:"application/json" },
+          body:JSON.stringify(body)
+        });
+        sendResponse({
+          success:true,
+          thumbnails:(data.data || []).map((thumbnail) => ({
+            token:tokenByRequestId.get(thumbnail.requestId),
+            imageUrl:thumbnail.state === "Completed" ? thumbnail.imageUrl : null
+          })).filter((thumbnail) => thumbnail.token)
+        });
+      } catch (error) {
+        sendResponse({ success:false,error:error.message });
+      }
+    })();
+    return true;
+  }
+
   if (message.type !== "GET_PUBLIC_SERVERS") {
     return;
   }
@@ -199,8 +254,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const placeId = message.placeId;
 
   const query = new URLSearchParams({
-    sortOrder: "Desc",
-    excludeFullGames: "true",
+    sortOrder: message.sortOrder === "Asc" ? "Asc" : "Desc",
+    excludeFullGames: String(message.excludeFullGames !== false),
     limit: String(Math.min(100, Math.max(10, Number(message.limit) || 100)))
   });
 

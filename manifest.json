@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Roblox Server Navigator",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Improve Roblox server browsing with page navigation, player filters, favorites, server tools, random join, and rejoin.",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
     "https://games.roblox.com/*",
-    "https://apis.roblox.com/*"
+    "https://apis.roblox.com/*",
+    "https://thumbnails.roblox.com/*"
   ],
   "background": {
     "service_worker": "service-worker.js"

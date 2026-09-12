@@ -2,7 +2,7 @@ console.log("Roblox Server Navigator native integration loaded!");
 
 const PAGE_SIZE = 8;
 const TOTAL_BLOCK = 100;
-const LARGE_GAME_PLAYER_THRESHOLD = 10000;
+const LARGE_GAME_PLAYER_THRESHOLD = 25000;
 const FEATURE_SETTINGS_KEY = "rsn-feature-settings";
 const CURRENT_CAPACITY_KEY = "rsn-current-server-capacity";
 const DEFAULT_FEATURE_SETTINGS = {
@@ -29,6 +29,7 @@ function setFeatureVisible(element, visible) {
 }
 
 function applyFeatureVisibility() {
+  document.documentElement.classList.toggle("rsn-api-pagination-on",featureSettings.pagination);
   setFeatureVisible(document.querySelector("#rsn-random-server"), featureSettings.randomServer);
   setFeatureVisible(document.querySelector("#rsn-last-server"), featureSettings.rejoinServer);
   setFeatureVisible(document.querySelector("#rsn-native-pager .rsn-navigation"), featureSettings.pagination);
@@ -41,6 +42,7 @@ function applyFeatureVisibility() {
   document.querySelectorAll("#rsn-native-pager .rsn-page-jump-control").forEach((element) =>
     setFeatureVisible(element, featureSettings.pagination)
   );
+  setFeatureVisible(document.querySelector(".rsn-api-grid"), featureSettings.pagination);
   setFeatureVisible(document.querySelector(".rsn-server-search"), featureSettings.serverIdSearch);
   const favoritesInput = document.querySelector('[data-filter="favorites"]');
   const favoritesControl = favoritesInput?.closest(".rsn-toolbar-favorites") || favoritesInput?.closest("label");
@@ -60,7 +62,7 @@ function applyFeatureVisibility() {
   document.querySelectorAll('[data-tool="copy"]').forEach((element) => setFeatureVisible(element, featureSettings.copyId));
   document.querySelectorAll(".rsn-card-tools").forEach((row) => {
     const hasVisibleButton = [...row.querySelectorAll("button")].some((button) => button.style.display !== "none");
-    setFeatureVisible(row, hasVisibleButton || !row.querySelector(".rsn-ping")?.hidden);
+    setFeatureVisible(row, hasVisibleButton);
   });
 }
 
@@ -112,6 +114,8 @@ function loadMoreButton(section) {
 }
 
 function serverCards(section) {
+  const apiGrid = section.querySelector(".rsn-api-grid");
+  if (apiGrid) return [...apiGrid.querySelectorAll(".rsn-api-card")];
   const knownSelectors = [
     ".rbx-game-server-item",
     "[data-testid='game-server-item']",
@@ -167,7 +171,7 @@ function addStyles() {
       --rsn-accent-text:#fff;
     }
     :root #rsn-native-pager {
-      background:color-mix(in srgb,var(--rsn-page-theme) 72%,var(--rsn-button))!important;
+      background:var(--rsn-surface)!important;
     }
     :root .rsn-native-filter-row .rsn-filter-input,
     :root .rsn-server-search-input,
@@ -239,8 +243,24 @@ function addStyles() {
     .rsn-card-tool.rsn-on { color:#ffd75e; }
     .rsn-card-tool.rsn-avoided { background:#51272c; color:#ff6b72; box-shadow:inset 0 0 0 1px #784047; }
     .rsn-card-tool.rsn-copied { background:#24543a; color:#83e3a9; box-shadow:inset 0 0 0 1px #347452; }
-    .rsn-ping { margin-left:auto; padding:3px 7px; border-radius:999px; background:#555963; color:#fff; font-size:11px; font-weight:700; }
-    .rsn-ping.good { background:#267a4b; } .rsn-ping.fair { background:#8a6a20; } .rsn-ping.poor { background:#8a3540; }
+    .rsn-api-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; width:100%; margin-top:16px; }
+    .rsn-api-card { display:flex; min-width:0; min-height:270px; flex-direction:column; padding:14px; background:var(--rsn-surface); color:var(--rsn-text); }
+    .rsn-api-avatars { display:grid; grid-template-columns:repeat(3,52px); grid-auto-rows:52px; gap:8px; min-height:112px; margin-bottom:10px; }
+    .rsn-api-avatar-slot { display:grid; width:52px; height:52px; place-items:center; overflow:hidden; border-radius:50%; background:color-mix(in srgb,var(--rsn-page-theme) 58%,var(--rsn-button)); color:var(--rsn-text); font-size:16px; font-weight:700; }
+    .rsn-api-avatar-slot img { display:block; width:100%; height:100%; object-fit:cover; }
+    .rsn-api-avatar-slot.rsn-api-avatar-ghost { visibility:hidden; }
+    .rsn-api-player-count { margin-bottom:7px; font-size:16px; }
+    .rsn-api-progress { height:6px; margin-bottom:12px; overflow:hidden; border:1px solid var(--rsn-border); border-radius:999px; background:var(--rsn-input); }
+    .rsn-api-progress > span { display:block; height:100%; background:var(--rsn-muted); }
+    .rsn-api-join { width:100%; height:30px; margin-top:auto; border:0; border-radius:7px; background:var(--rsn-button); color:var(--rsn-text); cursor:pointer; font-weight:700; }
+    .rsn-api-join:hover { background:var(--rsn-button-hover); }
+    .rsn-api-join:disabled { cursor:not-allowed; opacity:.5; }
+    .rsn-api-id { color:var(--rsn-muted); font-size:11px; font-weight:600; }
+    :root.rsn-api-pagination-on .rsn-api-mode .rbx-public-game-server-item,
+    :root.rsn-api-pagination-on .rsn-api-mode .rbx-game-server-item,
+    :root.rsn-api-pagination-on .rsn-api-mode .card-item-public-server,
+    :root.rsn-api-pagination-on .rsn-api-mode [data-testid="game-server-item"] { display:none!important; }
+    @media (max-width:900px) { .rsn-api-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
   `;
   document.head.appendChild(style);
 
@@ -261,7 +281,10 @@ function addStyles() {
     document.documentElement.classList.toggle("rsn-light-page", lightPage);
 
     const rootStyle = document.documentElement.style;
-    const nativeCard = document.querySelector(".rbx-public-game-server-item,.card-item-public-server");
+    const nativeCard = [...document.querySelectorAll(".rbx-public-game-server-item,.rbx-game-server-item,.card-item-public-server,[data-testid='game-server-item']")].find((card) => {
+      const rect = card.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && !card.closest(".rsn-api-grid");
+    }) || null;
     const nativeJoin = nativeCard && exactText(nativeCard, "button,a,[role='button']", "Join")[0];
     const nativeSortControl = document.querySelector(".rsn-native-sort-row .select-group select,.rsn-native-sort-row .select-group [role='combobox'],.rsn-native-sort-row .select-group button");
     const nativeDetails = nativeCard?.querySelector(".rbx-public-game-server-details,.game-server-details");
@@ -280,10 +303,10 @@ function addStyles() {
           const distance = channels.length >= 3
             ? Math.abs(channels[0]-pageChannels[0]) + Math.abs(channels[1]-pageChannels[1]) + Math.abs(channels[2]-pageChannels[2])
             : -1;
-          return { background, fillsCard, distance };
-        }).filter((candidate) => candidate.background && candidate.fillsCard).sort((left,right) => right.distance-left.distance)
+          return { background, fillsCard, distance, area:rect.width * rect.height };
+        }).filter((candidate) => candidate.background && candidate.fillsCard).sort((left,right) => right.area-left.area || right.distance-left.distance)
       : [];
-    const cardThemeBackground = cardSurfaceCandidates[0]?.background || usableColor(cardStyles?.backgroundColor || "");
+    const cardThemeBackground = usableColor(cardStyles?.backgroundColor || "") || cardSurfaceCandidates[0]?.background;
     const themeColors = {
       "--rsn-surface":cardThemeBackground,
       "--rsn-input":usableColor(sortStyles?.backgroundColor || ""),
@@ -316,8 +339,8 @@ function installRandomServerButton() {
   const randomButton = document.createElement("button");
   randomButton.id = "rsn-random-server";
   randomButton.type = "button";
-  randomButton.title = "Join a random low-ping server";
-  randomButton.setAttribute("aria-label", "Join a random low-ping server");
+  randomButton.title = "Join a random available server";
+  randomButton.setAttribute("aria-label", "Join a random available server");
 
   const showShuffleIcon = () => {
     randomButton.innerHTML = `
@@ -400,19 +423,7 @@ function installRandomServerButton() {
       });
       const available = result.servers.filter((server) => server.playing < server.maxPlayers);
       if (!available.length) throw new Error("No available public servers were found.");
-      const serversWithPing = available
-        .filter((server) => Number.isFinite(server.ping) && server.ping > 0)
-        .sort((left, right) => left.ping - right.ping);
-      const rankedServers = serversWithPing.length ? serversWithPing : available;
-      // Randomize within the best 20% (at least five, at most twenty) so the
-      // result favors low latency without repeatedly choosing one server.
-      const poolSize = Math.min(
-        rankedServers.length,
-        20,
-        Math.max(5, Math.ceil(rankedServers.length * 0.2))
-      );
-      const preferredPool = rankedServers.slice(0, poolSize);
-      const server = preferredPool[Math.floor(Math.random() * preferredPool.length)];
+      const server = available[Math.floor(Math.random() * available.length)];
       chrome.storage.local.set({ [lastServerKey]: server.id }, () => {
         setLastAvailable(true);
       });
@@ -474,16 +485,6 @@ function installRandomServerButton() {
   }, true);
 }
 
-function waitForCards(section, count) {
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => { if (done) return; done = true; observer.disconnect(); clearTimeout(timer); resolve(serverCards(section).length > count); };
-    const observer = new MutationObserver(() => { if (serverCards(section).length > count) finish(); });
-    observer.observe(section, { childList:true, subtree:true });
-    const timer = setTimeout(finish, 7000);
-  });
-}
-
 function install(section) {
   if (document.querySelector("#rsn-native-pager")) return;
   const nativeMore = loadMoreButton(section);
@@ -494,9 +495,8 @@ function install(section) {
   pager.id = "rsn-native-pager";
   pager.innerHTML = `
     <div class="rsn-server-search">
-      <input class="rsn-server-search-input" data-search-server-id type="search" placeholder="Search server ID" aria-label="Server ID">
-      <button class="rsn-button" data-action="server-search">Search ID</button>
-      <button class="rsn-button" data-action="server-join" hidden>Join</button>
+      <input class="rsn-server-search-input" data-search-server-id type="search" placeholder="Join by server ID" aria-label="Server ID">
+      <button class="rsn-button" data-action="server-id-join">Join ID</button>
     </div>
     <div class="rsn-filters">
       <label class="rsn-filter-field">Min players <input class="rsn-filter-input" data-filter="min" type="number" min="0" step="1" placeholder="0" aria-label="Minimum players"></label>
@@ -561,6 +561,10 @@ function install(section) {
     filterBar.classList.add("rsn-native-filter-row");
     sortRow.insertAdjacentElement("afterend", filterBar);
   }
+  section.classList.add("rsn-api-mode");
+  const apiGrid = document.createElement("div");
+  apiGrid.className = "rsn-api-grid";
+  nativeMore.insertAdjacentElement("beforebegin", apiGrid);
   nativeMore.dataset.rsnNativeMore = "true";
   nativeMore.style.display = "none";
   applyFeatureVisibility();
@@ -579,8 +583,8 @@ function install(section) {
     }, 2500);
   }).observe(status, { childList:true, characterData:true, subtree:true });
   const serverSearchInput = serverSearch.querySelector("[data-search-server-id]");
-  const joinFoundButton = serverSearch.querySelector('[data-action="server-join"]');
-  const state = { page:1, total:null, capped:false, ended:false, busy:false, largeGame:false, playerCount:0 };
+  const serverIdJoinButton = serverSearch.querySelector('[data-action="server-id-join"]');
+  const state = { page:1, total:null, capped:false, ended:false, busy:false, largeGame:false, playerCount:0, nextCursor:null, requestVersion:0 };
   const totalKey = `rsn-native-total-${getPlaceId()}`;
   const favoriteKey = `rsn-favorites-${getPlaceId()}`;
   const avoidKey = `rsn-avoided-${getPlaceId()}`;
@@ -588,8 +592,10 @@ function install(section) {
   const favorites = new Set();
   const avoided = new Set();
   const serverInfo = new Map();
+  const apiServers = [];
+  const thumbnailCache = new Map();
+  const thumbnailRequests = new Set();
   const copyResetTimers = new WeakMap();
-  let foundServerId = null;
   const filters = {
     min:Math.max(0, Number(featureSettings.minPlayers) || 0),
     max:featureSettings.maxPlayers === null || featureSettings.maxPlayers === undefined || featureSettings.maxPlayers === ""
@@ -605,6 +611,7 @@ function install(section) {
       if (!server?.id) continue;
       serverInfo.set(`${server.id.slice(0,4)}-${server.id.slice(-4)}`.toLowerCase(), server);
     }
+    if (!featureSettings.pagination) decorate();
     render();
   });
   window.dispatchEvent(new CustomEvent("rsn-request-native-server-data"));
@@ -625,9 +632,6 @@ function install(section) {
   });
 
   function shortId(card) { return card.textContent.match(/\bID\s*:\s*([0-9a-f]{4}-[0-9a-f]{4})\b/i)?.[1]?.toLowerCase() || null; }
-  function cardServerId(card) {
-    return card.dataset.rsnServerId || card.querySelector(".rsn-card-tools")?.dataset.id || shortId(card);
-  }
   function normalizeServerId(value) {
     return String(value || "").replace(/^\s*ID\s*:\s*/i, "").trim().toLowerCase();
   }
@@ -647,7 +651,7 @@ function install(section) {
       let tools = details.querySelector(".rsn-card-tools");
       if (!tools) {
         tools=document.createElement("div"); tools.className="rsn-card-tools";
-        tools.innerHTML='<button class="rsn-card-tool" data-tool="favorite">☆</button><button class="rsn-card-tool" data-tool="avoid">⊘</button><button class="rsn-card-tool" data-tool="copy">Copy ID</button><span class="rsn-ping" hidden></span>';
+        tools.innerHTML='<button class="rsn-card-tool" data-tool="favorite">☆</button><button class="rsn-card-tool" data-tool="avoid">⊘</button><button class="rsn-card-tool" data-tool="copy">Copy ID</button>';
         idElement.insertAdjacentElement("beforebegin", tools);
       }
       tools.dataset.id=id;
@@ -675,73 +679,162 @@ function install(section) {
       }
       const favorite=tools.querySelector('[data-tool="favorite"]'); favorite.textContent=favorites.has(id)?"★":"☆"; favorite.classList.toggle("rsn-on",favorites.has(id));
       const avoid=tools.querySelector('[data-tool="avoid"]'); avoid.classList.toggle("rsn-avoided",avoided.has(id)); avoid.setAttribute("aria-pressed",String(avoided.has(id))); avoid.title=avoided.has(id)?"Remove avoid mark":"Mark server to avoid";
-      const info=serverInfo.get(id); const badge=tools.querySelector(".rsn-ping");
-      badge.hidden=true; badge.textContent=""; badge.className="rsn-ping";
-      if(info?.ping>0){badge.hidden=false;badge.textContent=`${info.ping} ms`;badge.className=`rsn-ping ${info.ping<=100?"good":info.ping<=180?"fair":"poor"}`;tools.dataset.fullId=info.id;}
+      const info=serverInfo.get(id);
+      if(info?.id) tools.dataset.fullId=info.id;
     });
     applyFeatureVisibility();
   }
-  function requestCardServerData() {
-    window.dispatchEvent(new CustomEvent("rsn-request-native-server-data"));
-  }
-  function cardPlayerCount(card) {
-    const countElement = card.querySelector(
-      ".game-server-details .text-info, .rbx-public-game-server-details .text-info"
-    );
-    const countText = countElement?.textContent || card.textContent || "";
-    const match = countText.match(/(\d+)\s+of\s+\d+/i);
-    return match ? Number(match[1]) : -1;
-  }
-  function cardMaxPlayers(card) {
-    const countElement = card.querySelector(
-      ".game-server-details .text-info, .rbx-public-game-server-details .text-info"
-    );
-    const countText = countElement?.textContent || card.textContent || "";
-    const match = countText.match(/\d+\s+of\s+(\d+)/i);
-    return match ? Number(match[1]) : -1;
-  }
   function loadedServerCapacity() {
-    return Math.max(-1, ...serverCards(section).map(cardMaxPlayers));
+    return Math.max(-1, ...apiServers.map((server) => Number(server.maxPlayers) || -1));
   }
-  function visibleCards() {
-    return serverCards(section).filter((card) => {
-      const id = cardServerId(card);
-      const players = cardPlayerCount(card);
-      if (featureSettings.favorites && filters.favoritesOnly && !favorites.has(id)) return false;
-      if (featureSettings.playerFilters && players < 0 && (filters.min > 0 || filters.max !== null)) return false;
-      if (featureSettings.playerFilters && players >= 0 && players < filters.min) return false;
+  function currentSortMode() {
+    const control = sortRow?.querySelector("select,[role='combobox'],button");
+    return control?.selectedOptions?.[0]?.textContent?.trim() || control?.textContent?.trim() || "Recommended For You";
+  }
+  function apiSortOrder() {
+    return currentSortMode() === "Fewest Players" ? "Asc" : "Desc";
+  }
+  function visibleServers() {
+    const matching = apiServers.filter((server) => {
+      const id = server.id;
+      const players = Number(server.playing);
+      if (featureSettings.favorites && filters.favoritesOnly && !hasSaved(favorites,id)) return false;
+      if (featureSettings.playerFilters && players < filters.min) return false;
       if (featureSettings.playerFilters && filters.max !== null && players > filters.max) return false;
       return true;
     });
+    return matching;
   }
 
-  function loadedPages() { return Math.max(1, Math.ceil(visibleCards().length / PAGE_SIZE)); }
+  function loadedPages() { return Math.max(1, Math.ceil(visibleServers().length / PAGE_SIZE)); }
+  function exactTotalPages() {
+    return state.total !== null && state.total !== undefined && !state.capped && Number.isFinite(Number(state.total))
+      ? Math.max(1,Math.floor(Number(state.total)))
+      : null;
+  }
+  function clampPage(page) {
+    const normalized = Math.max(1,Math.floor(Number(page) || 1));
+    const exactTotal = exactTotalPages();
+    return exactTotal === null ? normalized : Math.min(normalized,exactTotal);
+  }
   function hasActiveLocalFilter(capacity = loadedServerCapacity()) {
     const rangeFiltered = featureSettings.playerFilters && (
       filters.min > 0 || (filters.max !== null && (capacity < 0 || filters.max < capacity))
     );
     return rangeFiltered || (featureSettings.favorites && filters.favoritesOnly);
   }
-  function hasMore() {
-    const button = loadMoreButton(section);
-    return Boolean(button && button.getAttribute("aria-disabled") !== "true");
-  }
-  function equalizeVisibleCardHeights() {
-    const visible = serverCards(section).filter((card) => card.style.display !== "none");
-    if (!visible.length) return;
-    visible.forEach((card) => { card.style.minHeight = ""; });
-    const tallest = Math.max(0, ...visible.map((card) => card.getBoundingClientRect().height));
-    visible.forEach((card) => { card.style.minHeight = `${Math.ceil(tallest)}px`; });
-  }
+  function hasMore() { return !state.ended && (state.nextCursor !== null || apiServers.length === 0); }
   function excludesFullServers() {
     const checkbox = [...section.querySelectorAll('input[type="checkbox"]')].find((input) =>
       /exclude full servers/i.test(input.closest("label")?.textContent || input.parentElement?.textContent || "")
     );
     return checkbox ? checkbox.checked : true;
   }
+  function shortServerId(id) {
+    return `${id.slice(0,4)}-${id.slice(-4)}`;
+  }
+  function hasSaved(set,id) {
+    return set.has(id) || set.has(shortServerId(id).toLowerCase());
+  }
+  function showThumbnail(token,imageUrl) {
+    if (!imageUrl) return;
+    for (const slot of apiGrid.querySelectorAll(".rsn-api-avatar-slot[data-player-token]")) {
+      if (slot.dataset.playerToken !== token || slot.querySelector("img")) continue;
+      const image = document.createElement("img");
+      image.src = imageUrl;
+      image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
+      slot.replaceChildren(image);
+    }
+  }
+  async function loadVisibleThumbnails(servers) {
+    const tokens = [...new Set(servers.flatMap((server) =>
+      (server.playerTokens || []).slice(0,5).map(String).filter(Boolean)
+    ))];
+    for (const token of tokens) showThumbnail(token,thumbnailCache.get(token));
+    const missing = tokens.filter((token) => !thumbnailCache.has(token) && !thumbnailRequests.has(token));
+    if (!missing.length) return;
+    missing.forEach((token) => thumbnailRequests.add(token));
+    try {
+      const result = await sendMessage({ type:"GET_PLAYER_THUMBNAILS",tokens:missing });
+      if (!result?.success) throw new Error(result?.error || "Thumbnail request failed.");
+      for (const thumbnail of result.thumbnails || []) {
+        if (!thumbnail.imageUrl) continue;
+        thumbnailCache.set(thumbnail.token,thumbnail.imageUrl);
+        showThumbnail(thumbnail.token,thumbnail.imageUrl);
+      }
+    } catch (error) {
+      console.warn("Could not load player thumbnails:",error);
+    } finally {
+      missing.forEach((token) => thumbnailRequests.delete(token));
+    }
+  }
+  function createApiCard(server) {
+    const card = document.createElement("article");
+    card.className = "rsn-api-card";
+    card.dataset.rsnServerId = server.id;
+    const avatars = document.createElement("div");
+    avatars.className = "rsn-api-avatars";
+    const playerTokens = (server.playerTokens || []).slice(0,5).map(String).filter(Boolean);
+    for (let index = 0; index < 5; index += 1) {
+      const slot = document.createElement("div");
+      slot.className = "rsn-api-avatar-slot";
+      const token = playerTokens[index];
+      if (token) {
+        slot.dataset.playerToken = token;
+        const imageUrl = thumbnailCache.get(token);
+        if (imageUrl) {
+          const image = document.createElement("img");
+          image.src = imageUrl;
+          image.alt = "";
+          image.loading = "lazy";
+          image.decoding = "async";
+          slot.appendChild(image);
+        }
+      } else {
+        slot.classList.add("rsn-api-avatar-ghost");
+      }
+      avatars.appendChild(slot);
+    }
+    const more = document.createElement("div");
+    const remainingPlayers = Math.max(0,Number(server.playing) - playerTokens.length);
+    more.className = `rsn-api-avatar-slot${remainingPlayers ? "" : " rsn-api-avatar-ghost"}`;
+    more.textContent = remainingPlayers ? `+${remainingPlayers}` : "";
+    avatars.appendChild(more);
+    const count = document.createElement("div");
+    count.className = "rsn-api-player-count";
+    count.textContent = `${server.playing} of ${server.maxPlayers} people max`;
+    const progress = document.createElement("div");
+    progress.className = "rsn-api-progress";
+    const progressFill = document.createElement("span");
+    progressFill.style.width = `${Math.max(0,Math.min(100,(Number(server.playing)/Math.max(1,Number(server.maxPlayers)))*100))}%`;
+    progress.appendChild(progressFill);
+    const join = document.createElement("button");
+    join.className = "rsn-api-join";
+    join.type = "button";
+    join.textContent = "Join";
+    join.dataset.serverId = server.id;
+    join.disabled = Number(server.playing) >= Number(server.maxPlayers);
+    const tools = document.createElement("div");
+    tools.className = "rsn-card-tools";
+    tools.dataset.id = server.id;
+    tools.dataset.fullId = server.id;
+    tools.innerHTML = '<button class="rsn-card-tool" data-tool="favorite">☆</button><button class="rsn-card-tool" data-tool="avoid">⊘</button><button class="rsn-card-tool" data-tool="copy">Copy ID</button>';
+    const favorite = tools.querySelector('[data-tool="favorite"]');
+    favorite.textContent = hasSaved(favorites,server.id) ? "★" : "☆";
+    favorite.classList.toggle("rsn-on",hasSaved(favorites,server.id));
+    const avoid = tools.querySelector('[data-tool="avoid"]');
+    avoid.classList.toggle("rsn-avoided",hasSaved(avoided,server.id));
+    avoid.setAttribute("aria-pressed",String(hasSaved(avoided,server.id)));
+    const id = document.createElement("div");
+    id.className = "rsn-api-id";
+    id.textContent = `ID: ${shortServerId(server.id)}`;
+    card.append(avatars,count,progress,join,tools,id);
+    return card;
+  }
   function render() {
-    const cards = serverCards(section);
-    decorate();
+    state.page = clampPage(state.page);
     const capacity = loadedServerCapacity();
     if (capacity >= 0) {
       minFilterInput.max = capacity;
@@ -751,22 +844,30 @@ function install(section) {
         chrome.storage.local.set({ [CURRENT_CAPACITY_KEY]:{ placeId:getPlaceId(), capacity } });
       }
     }
-    const usable = visibleCards();
+    const usable = visibleServers();
     const start = (state.page - 1) * PAGE_SIZE;
-    cards.forEach((card) => {
-      card.style.display="none";
-      card.style.minHeight="";
-    });
-    const pageCards = usable.slice(start,start+PAGE_SIZE);
-    pageCards.forEach((card) => card.style.display="");
-    equalizeVisibleCardHeights();
+    const pageServers = usable.slice(start,start+PAGE_SIZE);
+    apiGrid.replaceChildren(...pageServers.map(createApiCard));
+    void loadVisibleThumbnails(pageServers);
+    requestAnimationFrame(() => window.__rsnSyncPageTheme?.());
+    applyFeatureVisibility();
     const locallyFiltered = hasActiveLocalFilter(capacity);
     const totalText = locallyFiltered
       ? `${loadedPages()} loaded`
       : state.capped ? `${Math.max(TOTAL_BLOCK, Math.ceil(state.page/TOTAL_BLOCK)*TOTAL_BLOCK)}+` : state.total ?? "…";
     label.textContent = `Page ${state.page} of ${totalText}`;
     input.value = state.page;
+    const exactTotal = exactTotalPages();
+    if (exactTotal === null) input.removeAttribute("max");
+    else input.max = exactTotal;
     [...pager.querySelectorAll("button")].forEach((button) => button.disabled = state.busy);
+    const atFirstPage = state.page <= 1;
+    const atLastPage = exactTotal !== null && state.page >= exactTotal;
+    for (const button of pager.querySelectorAll("[data-jump]")) {
+      const jump = button.dataset.jump;
+      if (jump === "first" || Number(jump) < 0) button.disabled = state.busy || atFirstPage;
+      else if (Number(jump) > 0) button.disabled = state.busy || atLastPage;
+    }
     const safetyMessage = state.largeGame
       ? `Disabled because this game has ${state.playerCount.toLocaleString()} active players.`
       : "";
@@ -776,45 +877,61 @@ function install(section) {
     }
   }
   window.addEventListener("rsn-feature-settings-changed", () => {
+    const previousMin = filters.min;
+    const previousMax = filters.max;
     filters.min = Math.max(0, Number(featureSettings.minPlayers) || 0);
     filters.max = featureSettings.maxPlayers === null || featureSettings.maxPlayers === undefined || featureSettings.maxPlayers === ""
       ? null
       : Math.max(filters.min, Number(featureSettings.maxPlayers) || 0);
     minFilterInput.value = filters.min || "";
     maxFilterInput.value = filters.max ?? "";
-    state.page = 1;
+    if (previousMin !== filters.min || previousMax !== filters.max) state.page = 1;
     chrome.storage.local.set({ [filterKey]:filters });
     render();
   });
   async function loadBatch() {
-    const button = loadMoreButton(section);
-    if (!button) { state.ended = true; return false; }
-    const count = serverCards(section).length;
-    button.click();
-    const added = await waitForCards(section, count);
-    const currentButton = loadMoreButton(section);
-    if (currentButton) currentButton.style.display = "none";
-    if (!added && !currentButton) state.ended = true;
-    requestCardServerData();
+    if (!hasMore()) return false;
+    const version = state.requestVersion;
+    const result = await sendMessage({
+      type:"GET_PUBLIC_SERVERS",
+      placeId:getPlaceId(),
+      cursor:state.nextCursor,
+      limit:100,
+      excludeFullGames:excludesFullServers(),
+      sortOrder:apiSortOrder()
+    });
+    if (!result?.success) throw new Error(result?.error || "Could not load public servers.");
+    if (version !== state.requestVersion) return false;
+    const known = new Set(apiServers.map((server) => server.id));
+    for (const server of result.servers || []) {
+      if (!server?.id || known.has(server.id)) continue;
+      known.add(server.id);
+      apiServers.push(server);
+      serverInfo.set(shortServerId(server.id).toLowerCase(),server);
+    }
+    state.nextCursor = result.nextPageCursor || null;
+    state.ended = !state.nextCursor;
     render();
-    return added;
+    return Boolean(result.servers?.length);
   }
   async function go(targetValue) {
-    const target = Math.max(1, Math.floor(Number(targetValue) || 1));
-    // Keep the current complete page visible as a ghost batch while Roblox
-    // appends enough hidden cards for the destination. This preserves the
-    // server grid's height and prevents the page from jumping while loading.
+    const target = clampPage(targetValue);
     state.busy = true; status.textContent = `Loading page ${target}…`; render();
-    // Roblox commonly appends eight cards at a time. Do not consider a page
-    // ready until all eight positions exist.
-    while (visibleCards().length < target * PAGE_SIZE && hasMore()) {
-      if (!(await loadBatch())) break;
-      status.textContent = `Loading page ${target}… (${loadedPages()} ready)`;
+    try {
+      while (visibleServers().length < target * PAGE_SIZE && hasMore()) {
+        if (!(await loadBatch())) break;
+        status.textContent = `Loading page ${target}… (${loadedPages()} ready)`;
+      }
+      state.page = Math.min(target, loadedPages());
+      if (!hasMore()) { state.ended=true; state.total=loadedPages(); state.capped=false; }
+      status.textContent = state.page < target ? `The last available page is ${state.page}.` : "";
+    } catch (error) {
+      state.page = Math.min(target,loadedPages(),exactTotalPages() ?? target);
+      status.textContent = error.message;
+    } finally {
+      state.busy=false;
+      render();
     }
-    state.page = Math.min(target, loadedPages());
-    if (!hasMore()) { state.ended=true; state.total=loadedPages(); state.capped=false; }
-    status.textContent = state.page < target ? `The last available page is ${state.page}.` : "";
-    state.busy=false; render();
   }
   async function total(force=false, exact=false) {
     if (state.largeGame) return;
@@ -836,7 +953,9 @@ function install(section) {
         pageSize:PAGE_SIZE,
         excludeFullGames:excludesFullServers()
       });
+      if (!result?.success) throw new Error(result?.error || "Could not count public servers.");
       state.total=result.pages; state.capped=result.capped;
+      state.page=clampPage(state.page);
       chrome.storage.local.set({[totalKey]:result}); render();
       if (exact) await go(result.pages); else status.textContent="";
     } catch(error) { status.textContent=error.message; }
@@ -862,53 +981,59 @@ function install(section) {
     }
   }
 
-  async function searchServerId() {
+  function launchServerById(serverId) {
+    chrome.storage.local.set({ [`rsn-last-server-${getPlaceId()}`]:serverId });
+    window.dispatchEvent(new CustomEvent("rsn-join-game-instance", {
+      detail:{ placeId:getPlaceId(),serverId }
+    }));
+  }
+
+  async function joinServerId() {
     const query = normalizeServerId(serverSearchInput.value);
-    joinFoundButton.hidden = true;
-    foundServerId = null;
     section.querySelectorAll(".rsn-search-match").forEach((card) => card.classList.remove("rsn-search-match"));
     if (!isServerId(query)) {
       status.textContent = "Enter a full server ID or a short ID like abcd-1234.";
       return;
     }
 
-    const cards = serverCards(section);
-    const loadedMatch = cards.find((card) => {
-      const row = card.querySelector(".rsn-card-tools");
-      return matchesServerId(row?.dataset.fullId || cardServerId(card), query);
-    });
-    if (loadedMatch) {
-      const usable = visibleCards();
-      const index = usable.indexOf(loadedMatch);
-      if (index >= 0) {
-        state.page = Math.floor(index / PAGE_SIZE) + 1;
-        render();
-        loadedMatch.classList.add("rsn-search-match");
-        loadedMatch.scrollIntoView({ behavior:"smooth", block:"center" });
-        status.textContent = "Server found on a loaded page.";
-        setTimeout(() => loadedMatch.classList.remove("rsn-search-match"), 3500);
-        return;
-      }
+    const usable = visibleServers();
+    const index = usable.findIndex((server) => matchesServerId(server.id,query));
+    if (index >= 0) {
+      state.page = Math.floor(index / PAGE_SIZE) + 1;
+      render();
+      const loadedMatch = [...apiGrid.querySelectorAll(".rsn-api-card")].find((card) => matchesServerId(card.dataset.rsnServerId,query));
+      loadedMatch?.classList.add("rsn-search-match");
+      loadedMatch?.scrollIntoView({ behavior:"smooth", block:"center" });
+      launchServerById(usable[index].id);
+      status.textContent = "Joining server…";
+      setTimeout(() => loadedMatch?.classList.remove("rsn-search-match"),3500);
+      return;
     }
 
-    status.textContent = "Searching public servers…";
-    const searchButton = serverSearch.querySelector('[data-action="server-search"]');
-    searchButton.disabled = true;
+    if (query.length === 36) {
+      launchServerById(query);
+      status.textContent = "Joining server…";
+      return;
+    }
+
+    status.textContent = "Resolving shortened server ID…";
+    serverIdJoinButton.disabled = true;
     try {
       const result = await sendMessage({ type:"SEARCH_SERVER_ID", placeId:getPlaceId(), serverId:query });
       if (!result.server) {
         status.textContent = result.capped ? "Server not found in the first 10,000 public servers." : "Server ID not found in this game.";
         return;
       }
-      foundServerId = result.server.id;
-      joinFoundButton.hidden = false;
-      status.textContent = result.server.playing >= result.server.maxPlayers
-        ? "Server found, but it is currently full."
-        : `Server found — ${result.server.playing} of ${result.server.maxPlayers} players.`;
+      if (result.server.playing >= result.server.maxPlayers) {
+        status.textContent = "That server is currently full.";
+        return;
+      }
+      launchServerById(result.server.id);
+      status.textContent = "Joining server…";
     } catch (error) {
       status.textContent = error.message;
     } finally {
-      searchButton.disabled = false;
+      serverIdJoinButton.disabled = false;
     }
   }
 
@@ -928,17 +1053,29 @@ function install(section) {
   });
   serverSearch.addEventListener("click", async (event) => {
     const button = event.target.closest("button");
-    if (button?.dataset.action === "server-search") await searchServerId();
-    else if (button?.dataset.action === "server-join" && foundServerId) {
-      window.dispatchEvent(new CustomEvent("rsn-join-game-instance", { detail:{ placeId:getPlaceId(), serverId:foundServerId } }));
-    }
+    if (button?.dataset.action === "server-id-join") await joinServerId();
   });
   section.addEventListener("click", async (event) => {
+    const joinButton = event.target.closest(".rsn-api-join");
+    if (joinButton?.dataset.serverId) {
+      const serverId = joinButton.dataset.serverId;
+      chrome.storage.local.set({ [`rsn-last-server-${getPlaceId()}`]:serverId });
+      window.dispatchEvent(new CustomEvent("rsn-join-game-instance", { detail:{ placeId:getPlaceId(),serverId } }));
+      return;
+    }
     const tool=event.target.closest("[data-tool]"); if(!tool)return;
     event.preventDefault();event.stopPropagation();
     const row=tool.closest(".rsn-card-tools");const id=row?.dataset.id;if(!id)return;
-    if(tool.dataset.tool==="favorite"){favorites.has(id)?favorites.delete(id):favorites.add(id);chrome.storage.local.set({[favoriteKey]:[...favorites]});render();}
-    if(tool.dataset.tool==="avoid"){avoided.has(id)?avoided.delete(id):avoided.add(id);chrome.storage.local.set({[avoidKey]:[...avoided]});render();}
+    if(tool.dataset.tool==="favorite"){
+      const short=shortServerId(id).toLowerCase();
+      if(hasSaved(favorites,id)){favorites.delete(id);favorites.delete(short);}else favorites.add(id);
+      chrome.storage.local.set({[favoriteKey]:[...favorites]});render();
+    }
+    if(tool.dataset.tool==="avoid"){
+      const short=shortServerId(id).toLowerCase();
+      if(hasSaved(avoided,id)){avoided.delete(id);avoided.delete(short);}else avoided.add(id);
+      chrome.storage.local.set({[avoidKey]:[...avoided]});render();
+    }
     if(tool.dataset.tool==="copy"){
       clearTimeout(copyResetTimers.get(tool));
       try{
@@ -955,21 +1092,8 @@ function install(section) {
     }
   },true);
 
-  // Roblox replaces each card's inner contents after thumbnails and server
-  // details resolve. Reapply the utility row whenever that native DOM changes.
-  let decorateQueued = false;
-  new MutationObserver(() => {
-    if (decorateQueued) return;
-    decorateQueued = true;
-    requestAnimationFrame(() => {
-      decorateQueued = false;
-      decorate();
-      equalizeVisibleCardHeights();
-      window.__rsnSyncPageTheme?.();
-    });
-  }).observe(section, { childList:true, subtree:true });
   input.addEventListener("keydown", (event) => { if (event.key === "Enter") go(input.value); });
-  serverSearchInput.addEventListener("keydown", (event) => { if (event.key === "Enter") searchServerId(); });
+  serverSearchInput.addEventListener("keydown", (event) => { if (event.key === "Enter") joinServerId(); });
   function applyFilters() {
     const minValue = minFilterInput.value;
     const maxValue = maxFilterInput.value;
@@ -989,7 +1113,7 @@ function install(section) {
     chrome.storage.local.set({ [filterKey]:filters });
     state.page = 1;
     render();
-    const matching = visibleCards().length;
+    const matching = visibleServers().length;
     status.textContent = minValue === "" && maxValue === ""
       ? `Player filters cleared. ${matching} loaded servers available.`
       : `${matching} loaded servers match the Min/Max filter.`;
@@ -1003,7 +1127,7 @@ function install(section) {
     chrome.storage.local.set({ [filterKey]:filters });
     state.page = 1;
     render();
-    status.textContent = `Min/Max cleared. ${visibleCards().length} loaded servers available.`;
+    status.textContent = `Min/Max cleared. ${visibleServers().length} loaded servers available.`;
   }
   favoritesInput.addEventListener("change", applyFilters);
   for (const field of [minFilterInput, maxFilterInput]) {
@@ -1012,18 +1136,20 @@ function install(section) {
 
   function resetAfterNativeControl() {
     clearTimeout(resetTimer);
-    state.page=1; state.total=null; state.capped=false; state.ended=false; state.busy=false;
+    state.requestVersion += 1;
+    apiServers.length = 0;
+    state.page=1; state.total=null; state.capped=false; state.ended=false; state.busy=false; state.nextCursor=null;
     status.textContent="Refreshing servers…";
     chrome.storage.local.remove(totalKey);
     render();
     resetTimer=setTimeout(() => {
       const button=loadMoreButton(section); if(button) button.style.display="none";
-      status.textContent=""; render(); total(true,false);
+      status.textContent=""; go(1); total(true,false);
     }, 700);
   }
 
   section.addEventListener("change", (event) => {
-    if (event.target.matches('select,input[type="checkbox"]')) resetAfterNativeControl();
+    if (event.target.matches('select,input[type="checkbox"]') && !event.target.matches("[data-filter]")) resetAfterNativeControl();
   });
   document.addEventListener("click", (event) => {
     if (pager.contains(event.target)) return;
@@ -1034,9 +1160,6 @@ function install(section) {
   }, true);
 
   go(1).then(async () => {
-    sendMessage({type:"GET_PUBLIC_SERVERS",placeId:getPlaceId(),cursor:null,limit:100}).then((result)=>{
-      result.servers.forEach((server)=>serverInfo.set(`${server.id.slice(0,4)}-${server.id.slice(-4)}`.toLowerCase(),server));render();
-    }).catch(()=>{});
     if (!(await checkGameSize())) total(false,false);
   });
 }
